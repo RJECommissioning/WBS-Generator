@@ -751,20 +751,7 @@
             }
 
             addProtectionPanelEquipment(parentCode, equipmentByType, allEquipmentGroups) {
-                /**Add panel equipment to both FAT and SAT sections with support for multi-level hierarchy*/
-                const parentType = this.identifyEquipmentType(parentCode);
-                
-                if (parentType === '+UH') {
-                    this.addProtectionPanelEquipment(parentCode, equipmentByType, allEquipmentGroups);
-                } else if (parentType === '+WC') {
-                    this.addLvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups);
-                } else if (parentType === '+WA') {
-                    this.addHvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups);
-                } else {
-                    // Handle other panel types or add to ancillary
-                    this.addToAncillary(parentCode, equipmentByType);
-                }
-            }
+
 
             addToAncillary(parentCode, equipmentByType) {
                 /**Add unrecognized parent equipment to ancillary systems*/
