@@ -751,7 +751,71 @@
             }
 
             addProtectionPanelEquipment(parentCode, equipmentByType, allEquipmentGroups) {
-                /**Add protection panel equipment (+UH) to FAT and SAT sections*/
+                /**Add panel equipment to both FAT and SAT sections with support for multi-level hierarchy*/
+                const parentType = this.identifyEquipmentType(parentCode);
+                
+                if (parentType === '+UH') {
+                    this.addProtectionPanelEquipment(parentCode, equipmentByType, allEquipmentGroups);
+                } else if (parentType === '+WC') {
+                    this.addLvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups);
+                } else if (parentType === '+WA') {
+                    this.addHvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups);
+                } else {
+                    // Handle other panel types or add to ancillary
+                    this.addToAncillary(parentCode, equipmentByType);
+                }
+            }
+
+            addToAncillary(parentCode, equipmentByType) {
+                /**Add unrecognized parent equipment to ancillary systems*/
+                for (const sectionKey of ['fat_ancillary', 'sat_ancillary']) {
+                    const parentId = this.keySections[sectionKey];
+                    const equipmentParentId = this.createWbsNode(parentCode, parentId);
+                    
+                    for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                        for (const eqItem of equipmentList) {
+                            this.createWbsNode(eqItem.equipment, equipmentParentId);
+                        }
+                    }
+                }
+            }
+
+            addChildEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+                /**Handle equipment that is a child of another piece of equipment*/
+                // Find the parent equipment in the existing WBS structure
+                const parentNodes = this.wbsStructure.filter(node => node.WBS.includes(parentCode));
+                
+                for (const parentNode of parentNodes) {
+                    const parentWbsId = parentNode['WBS ID'];
+                    
+                    for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                        if (eqType === 'CB') {
+                            const cbSectionId = this.createWbsNode("Circuit Breakers", parentWbsId, "CB");
+                            for (const eqItem of equipmentList) {
+                                const childEquipmentId = this.createWbsNode(eqItem.equipment, cbSectionId);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                            }
+                        } else if (eqType === 'CT') {
+                            const ctSectionId = this.createWbsNode("Current Transformers", parentWbsId, "CT");
+                            for (const eqItem of equipmentList) {
+                                const childEquipmentId = this.createWbsNode(eqItem.equipment, ctSectionId);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                            }
+                        } else if (eqType === 'VT') {
+                            const vtSectionId = this.createWbsNode("Voltage Transformers", parentWbsId, "VT");
+                            for (const eqItem of equipmentList) {
+                                const childEquipmentId = this.createWbsNode(eqItem.equipment, vtSectionId);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                            }
+                        } else {
+                            for (const eqItem of equipmentList) {
+                                const childEquipmentId = this.createWbsNode(eqItem.equipment, parentWbsId);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                            }
+                        }
+                    }
+                }
+            }
                 for (const sectionKey of ['fat_protection_panels', 'sat_protection_panels']) {
                     const parentId = this.keySections[sectionKey];
                     const equipmentParentId = this.createWbsNode(parentCode, parentId);
