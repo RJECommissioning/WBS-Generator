@@ -396,10 +396,10 @@
             }
 
             parseEquipmentList(equipmentData) {
-                console.log('=== PARSING EQUIPMENT LIST ===');
+                console.log('=== PARSING EQUIPMENT LIST - ENHANCED VERSION ===');
                 const equipmentGroups = {};
                 const orphanEquipment = [];
-                const processedRelationships = new Set(); // Track processed relationships
+                let skippedRelationships = 0;
                 
                 if (equipmentData.length > 0) {
                     console.log('Available columns in your data:', Object.keys(equipmentData[0]));
@@ -425,30 +425,29 @@
                             parent: null
                         });
                     } else {
-                        // Check for problematic relationships BEFORE adding them
-                        const relationshipKey = `${parent}->${equipment}`;
-                        const reverseKey = `${equipment}->${parent}`;
-                        
-                        // Skip if we've already processed the reverse relationship (circular reference)
-                        if (processedRelationships.has(reverseKey)) {
-                            console.log(`Skipping circular relationship: ${relationshipKey} (reverse already exists)`);
-                            continue;
+                        // AGGRESSIVE KF11 FILTERING - Skip ALL KF11 sibling relationships
+                        if (parent.includes('-KF11') && equipment.includes('-KF11')) {
+                            // Only allow direct parent-child like -KF11 -> -KF11-B
+                            if (!equipment.startsWith(parent + '-')) {
+                                console.log(`🚫 SKIPPING KF11 SIBLING: ${parent} -> ${equipment}`);
+                                skippedRelationships++;
+                                continue;
+                            }
                         }
                         
-                        // Skip if this creates a sibling-as-child relationship (KF11 issue)
-                        if (this.isSiblingRelationship(parent, equipment)) {
-                            console.log(`Skipping sibling relationship: ${relationshipKey}`);
-                            continue;
-                        }
-                        
-                        // Skip if equipment is trying to be its own child
+                        // Skip self-references
                         if (parent === equipment) {
-                            console.log(`Skipping self-reference: ${relationshipKey}`);
+                            console.log(`🚫 SKIPPING SELF-REFERENCE: ${parent} -> ${equipment}`);
+                            skippedRelationships++;
                             continue;
                         }
                         
-                        // Mark this relationship as processed
-                        processedRelationships.add(relationshipKey);
+                        // Skip any relationship where child contains parent name (circular pattern)
+                        if (equipment.includes(parent) && equipment !== parent && !equipment.startsWith(parent + '-')) {
+                            console.log(`🚫 SKIPPING CIRCULAR PATTERN: ${parent} -> ${equipment}`);
+                            skippedRelationships++;
+                            continue;
+                        }
                         
                         if (!equipmentGroups[parent]) {
                             equipmentGroups[parent] = {};
@@ -467,9 +466,13 @@
                     }
                 }
                 
-                console.log('Equipment groups found:', Object.keys(equipmentGroups).length);
-                console.log('Orphan equipment found:', orphanEquipment.length);
-                console.log('Processed relationships:', processedRelationships.size);
+                console.log('✅ Equipment groups found:', Object.keys(equipmentGroups).length);
+                console.log('✅ Orphan equipment found:', orphanEquipment.length);
+                console.log('🚫 Skipped problematic relationships:', skippedRelationships);
+                
+                // Log KF11 specific info
+                const kf11Groups = Object.keys(equipmentGroups).filter(key => key.includes('-KF11'));
+                console.log('🔧 KF11 parent groups:', kf11Groups.length);
                 
                 return { equipmentGroups, orphanEquipment };
             }
@@ -1268,7 +1271,7 @@
             return csvRows.join('\n');
         }
 
-        console.log('WBS Generator Application Loaded - Clean Version');
+        console.log('WBS Generator Application Loaded - Version 2.1 - KF11 Fix Applied');
     </script>
 </body>
 </html>
