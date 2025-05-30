@@ -730,6 +730,8 @@
             }
 
             addProtectionPanelEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+                console.log(`🔧 Processing Protection Panel equipment for: ${parentCode}`);
+                
                 for (const sectionKey of ['fat_protection_panels', 'sat_protection_panels']) {
                     const parentId = this.keySections[sectionKey];
                     const equipmentParentId = this.createWbsNode(parentCode, parentId);
@@ -739,6 +741,8 @@
                     const controlDevId = this.createWbsNode("Control Devices", equipmentParentId);
                     
                     for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                        console.log(`  Processing ${equipmentList.length} items of type ${eqType} under ${parentCode}`);
+                        
                         let targetParent;
                         
                         if (eqType === '-F') {
@@ -752,8 +756,20 @@
                         }
                         
                         for (const eqItem of equipmentList) {
+                            // BLOCK ALL KF11 EQUIPMENT FROM BEING ADDED
+                            if (eqItem.equipment.includes('-KF11')) {
+                                console.log(`🚫 BLOCKING KF11 in Protection Panel: ${eqItem.equipment}`);
+                                continue;
+                            }
+                            
                             const equipmentId = this.createWbsNode(eqItem.equipment, targetParent);
-                            this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups, 0);
+                            
+                            // PREVENT KF11 from having nested children
+                            if (!eqItem.equipment.includes('-KF11')) {
+                                this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups, 0);
+                            } else {
+                                console.log(`🚫 PREVENTING KF11 nested children: ${eqItem.equipment}`);
+                            }
                         }
                     }
                 }
@@ -1271,7 +1287,7 @@
             return csvRows.join('\n');
         }
 
-        console.log('WBS Generator Application Loaded - Version 2.2 - KF11 NUCLEAR OPTION');
+        console.log('WBS Generator Application Loaded - Version 2.3 - KF11 BLOCKED IN ALL EQUIPMENT METHODS');
     </script>
 </body>
 </html>
