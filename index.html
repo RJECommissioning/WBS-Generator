@@ -399,6 +399,7 @@
                 console.log('=== PARSING EQUIPMENT LIST ===');
                 const equipmentGroups = {};
                 const orphanEquipment = [];
+                const processedRelationships = new Set(); // Track processed relationships
                 
                 if (equipmentData.length > 0) {
                     console.log('Available columns in your data:', Object.keys(equipmentData[0]));
@@ -424,6 +425,31 @@
                             parent: null
                         });
                     } else {
+                        // Check for problematic relationships BEFORE adding them
+                        const relationshipKey = `${parent}->${equipment}`;
+                        const reverseKey = `${equipment}->${parent}`;
+                        
+                        // Skip if we've already processed the reverse relationship (circular reference)
+                        if (processedRelationships.has(reverseKey)) {
+                            console.log(`Skipping circular relationship: ${relationshipKey} (reverse already exists)`);
+                            continue;
+                        }
+                        
+                        // Skip if this creates a sibling-as-child relationship (KF11 issue)
+                        if (this.isSiblingRelationship(parent, equipment)) {
+                            console.log(`Skipping sibling relationship: ${relationshipKey}`);
+                            continue;
+                        }
+                        
+                        // Skip if equipment is trying to be its own child
+                        if (parent === equipment) {
+                            console.log(`Skipping self-reference: ${relationshipKey}`);
+                            continue;
+                        }
+                        
+                        // Mark this relationship as processed
+                        processedRelationships.add(relationshipKey);
+                        
                         if (!equipmentGroups[parent]) {
                             equipmentGroups[parent] = {};
                         }
@@ -443,8 +469,37 @@
                 
                 console.log('Equipment groups found:', Object.keys(equipmentGroups).length);
                 console.log('Orphan equipment found:', orphanEquipment.length);
+                console.log('Processed relationships:', processedRelationships.size);
                 
                 return { equipmentGroups, orphanEquipment };
+            }
+
+            isSiblingRelationship(parent, child) {
+                // Detect when equipment that should be siblings are listed as parent-child
+                
+                // KF11 pattern: -KF11-A should not be parent of -KF11-B (they're siblings)
+                if (parent.includes('-KF11') && child.includes('-KF11')) {
+                    // Extract the base (everything before the last component)
+                    const parentBase = parent.substring(0, parent.lastIndexOf('-'));
+                    const childBase = child.substring(0, child.lastIndexOf('-'));
+                    
+                    // If they have the same base, they're siblings, not parent-child
+                    if (parentBase === childBase && parentBase.length > 0) {
+                        return true;
+                    }
+                }
+                
+                // Add more sibling detection patterns as needed
+                // Example: CB01 should not be parent of CB02
+                if (parent.match(/CB\d+$/) && child.match(/CB\d+$/)) {
+                    const parentPrefix = parent.replace(/CB\d+$/, '');
+                    const childPrefix = child.replace(/CB\d+$/, '');
+                    if (parentPrefix === childPrefix) {
+                        return true;
+                    }
+                }
+                
+                return false;
             }
 
             extractParent(item) {
