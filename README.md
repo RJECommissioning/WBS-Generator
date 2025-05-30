@@ -1143,7 +1143,55 @@
                 }
             }
 
-            addOrphanEquipment(orphanEquipment) {
+            determineWcCategory(eqType, protId, meterId, ctId) {
+                /**Determine which WC subsection to use based on equipment type*/
+                if (eqType && eqType.toUpperCase().includes('CT')) {
+                    return ctId;
+                } else if (eqType && ['PROT', 'RELAY', 'SWITCH'].some(word => eqType.toUpperCase().includes(word))) {
+                    return protId;
+                } else {
+                    return meterId;  // Default to metering devices
+                }
+            }
+
+            addNestedChildren(parentEquipment, parentWbsId, allEquipmentGroups) {
+                /**Add nested children for equipment that has sub-equipment*/
+                if (allEquipmentGroups[parentEquipment]) {
+                    const childEquipmentByType = allEquipmentGroups[parentEquipment];
+                    
+                    for (const [eqType, equipmentList] of Object.entries(childEquipmentByType)) {
+                        if (eqType === 'CB') {
+                            // Create Circuit Breakers subsection
+                            const cbSectionId = this.createWbsNode("Circuit Breakers", parentWbsId, "CB");
+                            for (const eqItem of equipmentList) {
+                                const childEquipmentId = this.createWbsNode(eqItem.equipment, cbSectionId);
+                                // Recursively check for more children
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                            }
+                        } else if (eqType === 'CT') {
+                            // Create Current Transformers subsection
+                            const ctSectionId = this.createWbsNode("Current Transformers", parentWbsId, "CT");
+                            for (const eqItem of equipmentList) {
+                                const childEquipmentId = this.createWbsNode(eqItem.equipment, ctSectionId);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                            }
+                        } else if (eqType === 'VT') {
+                            // Create Voltage Transformers subsection
+                            const vtSectionId = this.createWbsNode("Voltage Transformers", parentWbsId, "VT"); 
+                            for (const eqItem of equipmentList) {
+                                const childEquipmentId = this.createWbsNode(eqItem.equipment, vtSectionId);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                            }
+                        } else {
+                            // Other equipment types - add directly
+                            for (const eqItem of equipmentList) {
+                                const childEquipmentId = this.createWbsNode(eqItem.equipment, parentWbsId);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                            }
+                        }
+                    }
+                }
+            }
                 for (const eqItem of orphanEquipment) {
                     const eqType = eqItem.type;
                     const equipmentName = eqItem.equipment;
@@ -1171,18 +1219,35 @@
             }
 
             generateWbs(equipmentData, projectName = "Project Name") {
+                /**Main function to generate complete WBS structure*/
+                console.log('=== generateWbs() START ===');
+                console.log('Equipment data received:', equipmentData?.length || 0, 'items');
+                
                 if (!equipmentData || equipmentData.length === 0) {
                     console.warn("No equipment data provided");
                     return [];
                 }
                 
+                console.log('Sample equipment data:', equipmentData.slice(0, 3));
+                
+                // Parse equipment
+                console.log('Calling parseEquipmentList...');
                 const { equipmentGroups, orphanEquipment } = this.parseEquipmentList(equipmentData);
                 
+                console.log('Equipment groups:', Object.keys(equipmentGroups).length, 'parents');
+                console.log('Orphan equipment:', orphanEquipment.length, 'items');
+                
+                // Build base structure
+                console.log('Building standard structure...');
                 this.buildStandardStructure(projectName);
+                console.log('Standard structure built:', this.wbsStructure.length, 'nodes');
                 
+                // Add equipment
+                console.log('Adding equipment to structure...');
                 this.addEquipmentToStructure(equipmentGroups, orphanEquipment);
+                console.log('Final structure:', this.wbsStructure.length, 'nodes');
                 
-                console.log(`Generated WBS with ${this.wbsStructure.length} nodes`);
+                console.log('=== generateWbs() END ===');
                 return this.wbsStructure;
             }
         }
