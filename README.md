@@ -387,12 +387,179 @@
                 const equipmentGroups = {};
                 const orphanEquipment = [];
                 
-                for (const item of equipmentData) {
-                    const parent = (item.parent || '').trim();
-                    const equipment = (item.equipment || '').trim();
-                    const pluName = (item.plu_name || '').trim();
+                // Debug: Log the first few items to see column names and mapped values
+                if (equipmentData.length > 0) {
+                    console.log('Available columns in your data:', Object.keys(equipmentData[0]));
+                    console.log('First equipment item (raw):', equipmentData[0]);
                     
-                    if (!equipment) continue;
+                    // Show how the mapping worked for first item
+                    const firstItem = equipmentData[0];
+                    const mappedParent = (
+                        firstItem.parent || 
+                        firstItem.Parent || 
+                        firstItem['parent equipment number'] ||
+                        firstItem['Parent Equipment Number'] ||
+                        firstItem['parent_equipment_number'] ||
+                        firstItem['Parent_Equipment_Number'] ||
+                        firstItem['parent equipment'] ||
+                        firstItem['Parent Equipment'] ||
+                        firstItem['parent_equipment'] ||
+                        firstItem['Parent_Equipment'] ||
+                        firstItem['parent number'] ||
+                        firstItem['Parent Number'] ||
+                        firstItem['parent_number'] ||
+                        firstItem['Parent_Number'] ||
+                        firstItem['parent eq'] ||
+                        firstItem['Parent Eq'] ||
+                        firstItem['parent_eq'] ||
+                        firstItem['Parent_Eq'] ||
+                        firstItem['parent code'] ||
+                        firstItem['Parent Code'] ||
+                        firstItem['parent_code'] ||
+                        firstItem['Parent_Code'] ||
+                        ''
+                    ).trim();
+                    
+                    const mappedEquipment = (
+                        firstItem.equipment || 
+                        firstItem.Equipment ||
+                        firstItem['equipment number'] || 
+                        firstItem['Equipment Number'] ||
+                        firstItem['equipment_number'] || 
+                        firstItem['Equipment_Number'] ||
+                        firstItem['equipment code'] ||
+                        firstItem['Equipment Code'] ||
+                        firstItem['equipment_code'] ||
+                        firstItem['Equipment_Code'] ||
+                        firstItem['eq number'] ||
+                        firstItem['Eq Number'] ||
+                        firstItem['eq_number'] ||
+                        firstItem['Eq_Number'] ||
+                        firstItem['eq code'] ||
+                        firstItem['Eq Code'] ||
+                        firstItem['eq_code'] ||
+                        firstItem['Eq_Code'] ||
+                        firstItem.tag ||
+                        firstItem.Tag ||
+                        firstItem.TAG ||
+                        firstItem.number ||
+                        firstItem.Number ||
+                        firstItem.code ||
+                        firstItem.Code ||
+                        ''
+                    ).trim();
+                    
+                    console.log('Mapped values for first item:');
+                    console.log('  - Parent:', mappedParent || '(empty)');
+                    console.log('  - Equipment:', mappedEquipment || '(empty)');
+                    console.log('  - PLU/Description:', (
+                        firstItem.plu_name || 
+                        firstItem['PLU Name'] ||
+                        firstItem['plu name'] ||
+                        firstItem['Plu Name'] ||
+                        firstItem.plu || 
+                        firstItem.PLU || 
+                        firstItem.Plu ||
+                        firstItem.description || 
+                        firstItem.Description ||
+                        firstItem.DESCRIPTION ||
+                        firstItem.desc ||
+                        firstItem.Desc ||
+                        firstItem.DESC ||
+                        firstItem.name ||
+                        firstItem.Name ||
+                        firstItem.NAME ||
+                        ''
+                    ).trim() || '(empty)');
+                }
+                
+                for (const item of equipmentData) {
+                    // Handle multiple possible column name variations with comprehensive mapping
+                    const parent = (
+                        item.parent || 
+                        item.Parent || 
+                        item['parent equipment number'] ||
+                        item['Parent Equipment Number'] ||
+                        item['parent_equipment_number'] ||
+                        item['Parent_Equipment_Number'] ||
+                        item['parent equipment'] ||
+                        item['Parent Equipment'] ||
+                        item['parent_equipment'] ||
+                        item['Parent_Equipment'] ||
+                        item['parent number'] ||
+                        item['Parent Number'] ||
+                        item['parent_number'] ||
+                        item['Parent_Number'] ||
+                        item['parent eq'] ||
+                        item['Parent Eq'] ||
+                        item['parent_eq'] ||
+                        item['Parent_Eq'] ||
+                        item['parent code'] ||
+                        item['Parent Code'] ||
+                        item['parent_code'] ||
+                        item['Parent_Code'] ||
+                        ''
+                    ).trim();
+                    
+                    const equipment = (
+                        item.equipment || 
+                        item.Equipment ||
+                        item['equipment number'] || 
+                        item['Equipment Number'] ||
+                        item['equipment_number'] || 
+                        item['Equipment_Number'] ||
+                        item['equipment code'] ||
+                        item['Equipment Code'] ||
+                        item['equipment_code'] ||
+                        item['Equipment_Code'] ||
+                        item['eq number'] ||
+                        item['Eq Number'] ||
+                        item['eq_number'] ||
+                        item['Eq_Number'] ||
+                        item['eq code'] ||
+                        item['Eq Code'] ||
+                        item['eq_code'] ||
+                        item['Eq_Code'] ||
+                        item.tag ||
+                        item.Tag ||
+                        item.TAG ||
+                        item.number ||
+                        item.Number ||
+                        item.code ||
+                        item.Code ||
+                        ''
+                    ).trim();
+                    
+                    const pluName = (
+                        item.plu_name || 
+                        item['PLU Name'] ||
+                        item['plu name'] ||
+                        item['Plu Name'] ||
+                        item.plu || 
+                        item.PLU || 
+                        item.Plu ||
+                        item.description || 
+                        item.Description ||
+                        item.DESCRIPTION ||
+                        item.desc ||
+                        item.Desc ||
+                        item.DESC ||
+                        item.name ||
+                        item.Name ||
+                        item.NAME ||
+                        item.title ||
+                        item.Title ||
+                        item.TITLE ||
+                        item.label ||
+                        item.Label ||
+                        item.LABEL ||
+                        ''
+                    ).trim();
+                    
+                    if (!equipment) {
+                        console.warn('Skipping item with missing equipment:', item);
+                        continue;
+                    }
                     
                     if (!parent || parent === '-') {
                         const equipmentType = this.identifyEquipmentType(equipment);
@@ -875,6 +1042,9 @@
                     throw new Error('No valid equipment data found in file');
                 }
 
+                console.log('Equipment data sample:', equipmentData.slice(0, 5));
+                console.log('Total equipment items:', equipmentData.length);
+
                 // Generate WBS
                 generator = new WBSGenerator();
                 wbsData = generator.generateWbs(equipmentData, projectName);
@@ -898,10 +1068,15 @@
                     header: true,
                     dynamicTyping: true,
                     skipEmptyLines: true,
+                    transformHeader: function(header) {
+                        // Clean and standardize headers
+                        return header.trim().toLowerCase().replace(/\s+/g, '_');
+                    },
                     complete: function(results) {
                         if (results.errors.length > 0) {
                             console.warn('CSV parsing warnings:', results.errors);
                         }
+                        console.log('Parsed CSV data:', results.data.slice(0, 3)); // Log first 3 rows
                         resolve(results.data);
                     },
                     error: function(error) {
