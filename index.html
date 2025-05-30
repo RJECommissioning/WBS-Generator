@@ -547,15 +547,9 @@
                 return null;
             }
 
-            createWbsNode(name, parentId, shortName = null) {
-                if (shortName === null) {
-                    const siblings = this.wbsStructure.filter(node => node['Parent WBS'] === parentId);
-                    shortName = String(siblings.length + 1);
-                }
-                
+            createWbsNode(name, parentId) {
                 const node = {
                     'WBS ID': this.wbsCounter,
-                    'WBS Short Name': shortName.substring(0, 20),
                     'Parent WBS': parentId,
                     'WBS': name
                 };
@@ -571,52 +565,52 @@
                 this.wbsStructure = [];
                 
                 // Root project
-                const projectId = this.createWbsNode(projectName, null, "ROOT");
+                const projectId = this.createWbsNode(projectName, null);
                 
                 // Main phases
-                const fatId = this.createWbsNode("FAT", projectId, "FAT");
-                const satId = this.createWbsNode("SAT", projectId, "SAT");
-                const energisationId = this.createWbsNode("Energisation", projectId, "ENERG");
-                const prerequisitesId = this.createWbsNode("Pre-Requisites", projectId, "PREREQ");
-                const milestonesId = this.createWbsNode("Milestones", projectId, "MILES");
+                const fatId = this.createWbsNode("FAT", projectId);
+                const satId = this.createWbsNode("SAT", projectId);
+                const energisationId = this.createWbsNode("Energisation", projectId);
+                const prerequisitesId = this.createWbsNode("Pre-Requisites", projectId);
+                const milestonesId = this.createWbsNode("Milestones", projectId);
                 
-                // FAT structure
-                const fatProtectionPanelsId = this.createWbsNode("Protection Panels", fatId, "PROT_PAN");
-                const fatLvSwitchboardsId = this.createWbsNode("LV Switchboards", fatId, "LV_SW");
-                const fatHvSwitchboardsId = this.createWbsNode("HV Switchboards", fatId, "HV_SW");
-                const fatPrepId = this.createWbsNode("Preparations and set-up", fatId, "PREP");
-                const fatBuildingId = this.createWbsNode("Building Services", fatId, "BLDG");
-                const fatInterfaceId = this.createWbsNode("Interface Testing", fatId, "INTFC");
-                const fatAncillaryId = this.createWbsNode("Ancillary Systems", fatId, "ANCIL");
-                const fatTransformersId = this.createWbsNode("Transformers", fatId, "TRANS");
-                const fatProtectionId = this.createWbsNode("Protection Systems", fatId, "PROT");
+                // FAT structure - with FAT prefix for uniqueness
+                const fatProtectionPanelsId = this.createWbsNode("FAT - Protection Panels", fatId, "FAT_PROT");
+                const fatLvSwitchboardsId = this.createWbsNode("FAT - LV Switchboards", fatId, "FAT_LV");
+                const fatHvSwitchboardsId = this.createWbsNode("FAT - HV Switchboards", fatId, "FAT_HV");
+                const fatPrepId = this.createWbsNode("FAT - Preparations and set-up", fatId, "FAT_PREP");
+                const fatBuildingId = this.createWbsNode("FAT - Building Services", fatId, "FAT_BLDG");
+                const fatInterfaceId = this.createWbsNode("FAT - Interface Testing", fatId, "FAT_INTFC");
+                const fatAncillaryId = this.createWbsNode("FAT - Ancillary Systems", fatId, "FAT_ANCIL");
+                const fatTransformersId = this.createWbsNode("FAT - Transformers", fatId, "FAT_TRANS");
+                const fatProtectionId = this.createWbsNode("FAT - Protection Systems", fatId, "FAT_PROT_SYS");
                 
-                // SAT structure
-                const satProtectionPanelsId = this.createWbsNode("Protection Panels", satId, "PROT_PAN");
-                const satLvSwitchboardsId = this.createWbsNode("LV Switchboards", satId, "LV_SW");
-                const satHvSwitchboardsId = this.createWbsNode("HV Switchboards", satId, "HV_SW");
-                const satPrepId = this.createWbsNode("Preparations and set-up", satId, "PREP");
-                const satBuildingId = this.createWbsNode("Building Services", satId, "BLDG");
-                const satInterfaceId = this.createWbsNode("Interface Testing", satId, "INTFC");
-                const satAncillaryId = this.createWbsNode("Ancillary Systems", satId, "ANCIL");
-                const satTransformersId = this.createWbsNode("Transformers", satId, "TRANS");
-                const satProtectionId = this.createWbsNode("Protection Systems", satId, "PROT");
+                // SAT structure - with SAT prefix for uniqueness
+                const satProtectionPanelsId = this.createWbsNode("SAT - Protection Panels", satId, "SAT_PROT");
+                const satLvSwitchboardsId = this.createWbsNode("SAT - LV Switchboards", satId, "SAT_LV");
+                const satHvSwitchboardsId = this.createWbsNode("SAT - HV Switchboards", satId, "SAT_HV");
+                const satPrepId = this.createWbsNode("SAT - Preparations and set-up", satId, "SAT_PREP");
+                const satBuildingId = this.createWbsNode("SAT - Building Services", satId, "SAT_BLDG");
+                const satInterfaceId = this.createWbsNode("SAT - Interface Testing", satId, "SAT_INTFC");
+                const satAncillaryId = this.createWbsNode("SAT - Ancillary Systems", satId, "SAT_ANCIL");
+                const satTransformersId = this.createWbsNode("SAT - Transformers", satId, "SAT_TRANS");
+                const satProtectionId = this.createWbsNode("SAT - Protection Systems", satId, "SAT_PROT_SYS");
                 
                 // Interface Testing phases
-                this.createWbsNode("Phase 1", fatInterfaceId, "PH1");
-                this.createWbsNode("Phase 2", fatInterfaceId, "PH2");
-                this.createWbsNode("Phase 1", satInterfaceId, "PH1");
-                this.createWbsNode("Phase 2", satInterfaceId, "PH2");
+                this.createWbsNode("Phase 1", fatInterfaceId);
+                this.createWbsNode("Phase 2", fatInterfaceId);
+                this.createWbsNode("Phase 1", satInterfaceId);
+                this.createWbsNode("Phase 2", satInterfaceId);
                 
                 // Energisation structure
-                const systemId = this.createWbsNode("System", energisationId, "SYS");
-                this.createWbsNode("Pre Energisation", systemId, "PRE");
-                this.createWbsNode("Energisation", systemId, "ENERG");
-                this.createWbsNode("Post Energisation", systemId, "POST");
+                const systemId = this.createWbsNode("System", energisationId);
+                this.createWbsNode("Pre Energisation", systemId);
+                this.createWbsNode("Energisation", systemId);
+                this.createWbsNode("Post Energisation", systemId);
                 
                 // Pre-requisites
-                this.createWbsNode("Phase 1", prerequisitesId, "PH1");
-                this.createWbsNode("Phase 2", prerequisitesId, "PH2");
+                this.createWbsNode("Phase 1", prerequisitesId);
+                this.createWbsNode("Phase 2", prerequisitesId);
                 
                 // Store key sections
                 this.keySections = {
@@ -682,9 +676,9 @@
                     const parentId = this.keySections[sectionKey];
                     const equipmentParentId = this.createWbsNode(parentCode, parentId);
                     
-                    const feederProtId = this.createWbsNode("Feeder Protection", equipmentParentId, "FEED_PROT");
-                    const networkDevId = this.createWbsNode("Network Devices", equipmentParentId, "NET_DEV");
-                    const controlDevId = this.createWbsNode("Control Devices", equipmentParentId, "CTRL_DEV");
+                    const feederProtId = this.createWbsNode("Feeder Protection", equipmentParentId);
+                    const networkDevId = this.createWbsNode("Network Devices", equipmentParentId);
+                    const controlDevId = this.createWbsNode("Control Devices", equipmentParentId);
                     
                     for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
                         let targetParent;
@@ -701,7 +695,7 @@
                         
                         for (const eqItem of equipmentList) {
                             const equipmentId = this.createWbsNode(eqItem.equipment, targetParent);
-                            this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
+                            this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups, 0);
                         }
                     }
                 }
@@ -712,9 +706,9 @@
                     const parentId = this.keySections[sectionKey];
                     const equipmentParentId = this.createWbsNode(parentCode, parentId);
                     
-                    const protId = this.createWbsNode("Protection Devices", equipmentParentId, "PROT");
-                    const meterId = this.createWbsNode("Metering Devices", equipmentParentId, "METER");
-                    const ctId = this.createWbsNode("Current Transformers", equipmentParentId, "CT");
+                    const protId = this.createWbsNode("Protection Devices", equipmentParentId);
+                    const meterId = this.createWbsNode("Metering Devices", equipmentParentId);
+                    const ctId = this.createWbsNode("Current Transformers", equipmentParentId);
                     
                     for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
                         let targetParent;
@@ -740,12 +734,12 @@
             addHvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups) {
                 for (const sectionKey of ['fat_hv_switchboards', 'sat_hv_switchboards']) {
                     const parentId = this.keySections[sectionKey];
-                    const tiersId = this.createWbsNode("Tiers", parentId, "TIERS");
+                    const tiersId = this.createWbsNode("Tiers", parentId);
                     const equipmentParentId = this.createWbsNode(parentCode, tiersId);
                     
-                    const cbId = this.createWbsNode("Circuit Breakers", equipmentParentId, "CB");
-                    const ctId = this.createWbsNode("Current Transformers", equipmentParentId, "CT");
-                    const vtId = this.createWbsNode("Voltage Transformers", equipmentParentId, "VT");
+                    const cbId = this.createWbsNode("Circuit Breakers", equipmentParentId);
+                    const ctId = this.createWbsNode("Current Transformers", equipmentParentId);
+                    const vtId = this.createWbsNode("Voltage Transformers", equipmentParentId);
                     
                     for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
                         let targetParent;
@@ -816,7 +810,13 @@
                 }
             }
 
-            addNestedChildren(parentEquipment, parentWbsId, allEquipmentGroups) {
+            addNestedChildren(parentEquipment, parentWbsId, allEquipmentGroups, currentDepth = 0) {
+                // Limit nesting to prevent excessive depth (max 5 levels from equipment)
+                if (currentDepth >= 3) {
+                    console.log(`Depth limit reached for ${parentEquipment} at level ${currentDepth}`);
+                    return;
+                }
+                
                 if (allEquipmentGroups[parentEquipment]) {
                     const childEquipmentByType = allEquipmentGroups[parentEquipment];
                     
@@ -824,25 +824,42 @@
                         if (eqType === 'CB') {
                             const cbSectionId = this.createWbsNode("Circuit Breakers", parentWbsId, "CB");
                             for (const eqItem of equipmentList) {
+                                // Prevent self-reference
+                                if (eqItem.equipment === parentEquipment) {
+                                    console.log(`Skipping self-reference: ${eqItem.equipment}`);
+                                    continue;
+                                }
                                 const childEquipmentId = this.createWbsNode(eqItem.equipment, cbSectionId);
-                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups, currentDepth + 1);
                             }
                         } else if (eqType === 'CT') {
                             const ctSectionId = this.createWbsNode("Current Transformers", parentWbsId, "CT");
                             for (const eqItem of equipmentList) {
+                                if (eqItem.equipment === parentEquipment) {
+                                    console.log(`Skipping self-reference: ${eqItem.equipment}`);
+                                    continue;
+                                }
                                 const childEquipmentId = this.createWbsNode(eqItem.equipment, ctSectionId);
-                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups, currentDepth + 1);
                             }
                         } else if (eqType === 'VT') {
                             const vtSectionId = this.createWbsNode("Voltage Transformers", parentWbsId, "VT"); 
                             for (const eqItem of equipmentList) {
+                                if (eqItem.equipment === parentEquipment) {
+                                    console.log(`Skipping self-reference: ${eqItem.equipment}`);
+                                    continue;
+                                }
                                 const childEquipmentId = this.createWbsNode(eqItem.equipment, vtSectionId);
-                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups, currentDepth + 1);
                             }
                         } else {
                             for (const eqItem of equipmentList) {
+                                if (eqItem.equipment === parentEquipment) {
+                                    console.log(`Skipping self-reference: ${eqItem.equipment}`);
+                                    continue;
+                                }
                                 const childEquipmentId = this.createWbsNode(eqItem.equipment, parentWbsId);
-                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups);
+                                this.addNestedChildren(eqItem.equipment, childEquipmentId, allEquipmentGroups, currentDepth + 1);
                             }
                         }
                     }
@@ -861,28 +878,28 @@
                             const parentId = this.keySections[sectionKey];
                             const equipmentId = this.createWbsNode(equipmentName, parentId);
                             
-                            this.createWbsNode("Feeder Protection", equipmentId, "FEED_PROT");
-                            this.createWbsNode("Network Devices", equipmentId, "NET_DEV");
-                            this.createWbsNode("Control Devices", equipmentId, "CTRL_DEV");
+                            this.createWbsNode("Feeder Protection", equipmentId);
+                            this.createWbsNode("Network Devices", equipmentId);
+                            this.createWbsNode("Control Devices", equipmentId);
                         }
                     } else if (eqType === '+WC') {
                         for (const sectionKey of ['fat_lv_switchboards', 'sat_lv_switchboards']) {
                             const parentId = this.keySections[sectionKey];
                             const equipmentId = this.createWbsNode(equipmentName, parentId);
                             
-                            this.createWbsNode("Protection Devices", equipmentId, "PROT");
-                            this.createWbsNode("Metering Devices", equipmentId, "METER");
-                            this.createWbsNode("Current Transformers", equipmentId, "CT");
+                            this.createWbsNode("Protection Devices", equipmentId);
+                            this.createWbsNode("Metering Devices", equipmentId);
+                            this.createWbsNode("Current Transformers", equipmentId);
                         }
                     } else if (eqType === '+WA') {
                         for (const sectionKey of ['fat_hv_switchboards', 'sat_hv_switchboards']) {
                             const parentId = this.keySections[sectionKey];
-                            const tiersId = this.createWbsNode("Tiers", parentId, "TIERS");
+                            const tiersId = this.createWbsNode("Tiers", parentId);
                             const equipmentId = this.createWbsNode(equipmentName, tiersId);
                             
-                            this.createWbsNode("Circuit Breakers", equipmentId, "CB");
-                            this.createWbsNode("Current Transformers", equipmentId, "CT");
-                            this.createWbsNode("Voltage Transformers", equipmentId, "VT");
+                            this.createWbsNode("Circuit Breakers", equipmentId);
+                            this.createWbsNode("Current Transformers", equipmentId);
+                            this.createWbsNode("Voltage Transformers", equipmentId);
                         }
                     } else if (eqType === 'T') {
                         for (const sectionKey of ['fat_transformers', 'sat_transformers']) {
@@ -1174,7 +1191,8 @@
         function convertToCSV(data) {
             if (!data || data.length === 0) return '';
             
-            const headers = Object.keys(data[0]);
+            // Only export the 3 essential columns
+            const headers = ['WBS ID', 'Parent WBS', 'WBS'];
             const csvRows = [];
             
             csvRows.push(headers.join(','));
