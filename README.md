@@ -366,7 +366,14 @@
                     'CB': 'Circuit Breakers',
                     'CT': 'Current Transformers',
                     'VT': 'Voltage Transformers',
-                    '+Z01-X01': 'Building Services'
+                    '+Z01-X01': 'Building Services',
+                    // Additional patterns for your equipment
+                    'T': 'Transformers',
+                    '+UC': 'Control Systems',
+                    '+CA': 'Capacitor Banks',
+                    '+HN': 'Auxiliary Systems',
+                    'D': 'Protection Devices',
+                    'E': 'Protection Devices'
                 };
                 
                 this.equipmentPatterns = {
@@ -379,7 +386,15 @@
                     '.*CB\\d+': 'Circuit Breakers',
                     '.*CT\\d+': 'Current Transformers',
                     '.*VT\\d+': 'Voltage Transformers',
-                    '\\+Z\\d+-X\\d+': 'Building Services'
+                    '\\+Z\\d+-X\\d+': 'Building Services',
+                    // Additional patterns for your specific equipment
+                    '^T\\d+': 'Transformers',
+                    '\\+UC\\d+': 'Control Systems',
+                    '\\+CA\\d+': 'Capacitor Banks',
+                    '\\+HN\\d+': 'Auxiliary Systems',
+                    '^D\\d+': 'Protection Devices',
+                    '^E\\d+': 'Protection Devices',
+                    'D\\d+\\s*/\\s*E\\d+': 'Protection Devices'
                 };
             }
 
