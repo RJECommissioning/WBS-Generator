@@ -357,12 +357,12 @@
                 this.wbsStructure = [];
                 
                 this.equipmentTypes = {
-                    '+UH': 'Panels',
-                    '+WC': 'Panels', 
-                    '+WA': 'Tiers',
-                    '-F': 'Initialization',
-                    '-KF': 'Devices',
-                    '-Y': 'Devices',
+                    '+UH': 'Protection Panels',
+                    '+WC': 'LV Switchboards', 
+                    '+WA': 'HV Switchboards',
+                    '-F': 'Feeder Protection',
+                    '-KF': 'Control Devices',
+                    '-Y': 'Network Devices',
                     'CB': 'Circuit Breakers',
                     'CT': 'Current Transformers',
                     'VT': 'Voltage Transformers',
@@ -377,12 +377,12 @@
                 };
                 
                 this.equipmentPatterns = {
-                    '\\+UH\\d+': 'Panels',
-                    '\\+WC\\d+': 'Panels',
-                    '\\+WA\\d+': 'Tiers',
-                    '.*-F\\d+': 'Initialization',
-                    '.*-KF\\d+': 'Devices',
-                    '.*-Y\\d+': 'Devices',
+                    '\\+UH\\d+': 'Protection Panels',
+                    '\\+WC\\d+': 'LV Switchboards',
+                    '\\+WA\\d+': 'HV Switchboards',
+                    '.*-F\\d+': 'Feeder Protection',
+                    '.*-KF\\d+': 'Control Devices',
+                    '.*-Y\\d+': 'Network Devices',
                     '.*CB\\d+': 'Circuit Breakers',
                     '.*CT\\d+': 'Current Transformers',
                     '.*VT\\d+': 'Voltage Transformers',
@@ -733,10 +733,12 @@
                 for (const [parentCode, equipmentByType] of Object.entries(equipmentGroups)) {
                     const parentType = this.identifyEquipmentType(parentCode);
                     
-                    if (['+UH', '+WC'].includes(parentType)) {
-                        this.addPanelEquipment(parentCode, equipmentByType, equipmentGroups);
+                    if (parentType === '+UH') {
+                        this.addProtectionPanelEquipment(parentCode, equipmentByType, equipmentGroups);
+                    } else if (parentType === '+WC') {
+                        this.addLvSwitchboardEquipment(parentCode, equipmentByType, equipmentGroups);
                     } else if (parentType === '+WA') {
-                        this.addTierEquipment(parentCode, equipmentByType, equipmentGroups);
+                        this.addHvSwitchboardEquipment(parentCode, equipmentByType, equipmentGroups);
                     } else if (['-F', '-KF', '-Y', 'CB', 'CT', 'VT'].includes(parentType)) {
                         this.addChildEquipment(parentCode, equipmentByType, equipmentGroups);
                     } else {
@@ -748,7 +750,138 @@
                 this.addOrphanEquipment(orphanEquipment);
             }
 
-            addPanelEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+            addProtectionPanelEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+                /**Add protection panel equipment (+UH) to FAT and SAT sections*/
+                for (const sectionKey of ['fat_protection_panels', 'sat_protection_panels']) {
+                    const parentId = this.keySections[sectionKey];
+                    const equipmentParentId = this.createWbsNode(parentCode, parentId);
+                    
+                    // Protection panels: Feeder Protection and Network Devices subsections
+                    const feederProtId = this.createWbsNode("Feeder Protection", equipmentParentId, "FEED_PROT");
+                    const networkDevId = this.createWbsNode("Network Devices", equipmentParentId, "NET_DEV");
+                    const controlDevId = this.createWbsNode("Control Devices", equipmentParentId, "CTRL_DEV");
+                    
+                    // Add equipment to appropriate subsections
+                    for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                        let targetParent, subsectionName;
+                        
+                        if (eqType === '-F') {
+                            targetParent = feederProtId;
+                            subsectionName = "Feeder Protection Relays";
+                        } else if (eqType === '-Y') {
+                            targetParent = networkDevId;
+                            subsectionName = "Network Devices";
+                        } else if (eqType === '-KF') {
+                            targetParent = controlDevId;
+                            subsectionName = "Control Devices";
+                        } else if (eqType === null) {
+                            // Unrecognized equipment goes to Ancillary Systems
+                            const ancillaryParent = this.keySections[sectionKey.replace('protection_panels', 'ancillary')];
+                            for (const eqItem of equipmentList) {
+                                this.createWbsNode(eqItem.equipment, ancillaryParent);
+                            }
+                            continue;
+                        } else {
+                            continue;
+                        }
+                        
+                        // Create subsection for equipment type
+                        const subsectionId = this.createWbsNode(subsectionName, targetParent);
+                        
+                        for (const eqItem of equipmentList) {
+                            const equipmentId = this.createWbsNode(eqItem.equipment, subsectionId);
+                            
+                            // Check if this equipment has its own children
+                            this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
+                        }
+                    }
+                }
+            }
+
+            addLvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+                /**Add LV switchboard equipment (+WC) to FAT and SAT sections*/
+                for (const sectionKey of ['fat_lv_switchboards', 'sat_lv_switchboards']) {
+                    const parentId = this.keySections[sectionKey];
+                    const equipmentParentId = this.createWbsNode(parentCode, parentId);
+                    
+                    // LV Switchboards: Protection Devices, Metering Devices, Current Transformers
+                    const protId = this.createWbsNode("Protection Devices", equipmentParentId, "PROT");
+                    const meterId = this.createWbsNode("Metering Devices", equipmentParentId, "METER");
+                    const ctId = this.createWbsNode("Current Transformers", equipmentParentId, "CT");
+                    
+                    // Add equipment to appropriate subsections
+                    for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                        let targetParent;
+                        
+                        if (['PROT', 'PROTECTION'].includes(eqType)) {
+                            targetParent = protId;
+                        } else if (['METER', 'METERING'].includes(eqType)) {
+                            targetParent = meterId;
+                        } else if (eqType === 'CT') {
+                            targetParent = ctId;
+                        } else if (eqType === null) {
+                            // Unrecognized equipment goes to Ancillary Systems
+                            const ancillaryParent = this.keySections[sectionKey.replace('lv_switchboards', 'ancillary')];
+                            for (const eqItem of equipmentList) {
+                                this.createWbsNode(eqItem.equipment, ancillaryParent);
+                            }
+                            continue;
+                        } else {
+                            // For LV switchboards, categorize based on equipment name patterns
+                            targetParent = this.determineWcCategory(eqType, protId, meterId, ctId);
+                        }
+                        
+                        for (const eqItem of equipmentList) {
+                            const equipmentId = this.createWbsNode(eqItem.equipment, targetParent);
+                            
+                            // Check if this equipment has its own children
+                            this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
+                        }
+                    }
+                }
+            }
+
+            addHvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+                /**Add HV switchboard equipment (+WA) to FAT and SAT sections*/
+                for (const sectionKey of ['fat_hv_switchboards', 'sat_hv_switchboards']) {
+                    const parentId = this.keySections[sectionKey];
+                    const tiersId = this.createWbsNode("Tiers", parentId, "TIERS");
+                    const equipmentParentId = this.createWbsNode(parentCode, tiersId);
+                    
+                    // Create standard subsections (CB's, Current Transformers, Voltage Transformers)
+                    const cbId = this.createWbsNode("Circuit Breakers", equipmentParentId, "CB");
+                    const ctId = this.createWbsNode("Current Transformers", equipmentParentId, "CT");
+                    const vtId = this.createWbsNode("Voltage Transformers", equipmentParentId, "VT");
+                    
+                    // Add equipment to appropriate subsections
+                    for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                        let targetParent;
+                        
+                        if (eqType === 'CB') {
+                            targetParent = cbId;
+                        } else if (eqType === 'CT') {
+                            targetParent = ctId;
+                        } else if (eqType === 'VT') {
+                            targetParent = vtId;
+                        } else if (eqType === null) {
+                            // Unrecognized equipment goes to Ancillary Systems
+                            const ancillaryParent = this.keySections[sectionKey.replace('hv_switchboards', 'ancillary')];
+                            for (const eqItem of equipmentList) {
+                                this.createWbsNode(eqItem.equipment, ancillaryParent);
+                            }
+                            continue;
+                        } else {
+                            continue;
+                        }
+                            
+                        for (const eqItem of equipmentList) {
+                            const equipmentId = this.createWbsNode(eqItem.equipment, targetParent);
+                            // Check if this equipment has its own children
+                            this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
+                        }
+                    }
+                }
+            }
                 const parentType = this.identifyEquipmentType(parentCode);
                 
                 for (const sectionKey of ['fat_panels', 'sat_panels']) {
