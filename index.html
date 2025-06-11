@@ -832,11 +832,11 @@
                 for (const sectionKey of ['fat_hv_switchboards', 'sat_hv_switchboards']) {
                     const parentId = this.keySections[sectionKey];
                     
-                    // FIXED: Create unique "Tiers" name using parent equipment
+                    // Create a unique "Tiers" node for each parent equipment under each section
                     const tiersId = this.createUniqueWbsNode("Tiers", parentId, parentCode);
                     const equipmentParentId = this.createWbsNode(parentCode, tiersId);
                     
-                    // FIXED: Create unique subcategory names using parent equipment
+                    // Create unique subcategory names using parent equipment
                     const cbId = this.createUniqueWbsNode("Circuit Breakers", equipmentParentId, parentCode);
                     const ctId = this.createUniqueWbsNode("Current Transformers", equipmentParentId, parentCode);
                     const vtId = this.createUniqueWbsNode("Voltage Transformers", equipmentParentId, parentCode);
