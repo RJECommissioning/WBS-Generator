@@ -1,39 +1,296 @@
-# WBS Generator for Commissioning Projects - Version 3.0
+# WBS Generator for Commissioning Projects - Version 3.1
 
-A specialized Work Breakdown Structure (WBS) generator designed for electrical commissioning projects that automatically creates comprehensive project structures by parsing equipment lists and mapping them to standardized commissioning phases with **direct parent-child relationships**.
+A specialized Work Breakdown Structure (WBS) generator designed for electrical commissioning projects that automatically creates comprehensive project structures by parsing equipment lists and mapping them to standardized commissioning phases with **hybrid structure: generic subcategories for clarity + direct parent-child naming for activity template alignment**.
 
-## What's New in Version 3.0
+## What's New in Version 3.1
 
-### 🎯 **Major Structural Changes**
-- **Eliminated Generic Subcategories**: Removed intermediate subcategory levels like "Feeder Protection", "Circuit Breakers", etc.
-- **Direct Parent-Child Relationships**: Equipment now creates direct relationships (e.g., `+UH01` → `+UH01 - -F01`)
-- **Activity Template Alignment**: WBS structure now perfectly aligns with activity template patterns for seamless P6 integration
-- **Cleaner Hierarchy**: Simplified structure reduces complexity and duplicate naming issues
+### 🎯 **Hybrid Structure Implementation**
+- **Retained Generic Subcategories**: Kept "Feeder Protection", "Circuit Breakers", etc. for user clarity and understanding
+- **Added Direct Parent-Child Naming**: Equipment uses format like `+UH01 - -F01` for perfect activity template alignment
+- **Best of Both Worlds**: Clear structure for humans + optimal mapping for activity systems
+- **Activity Template Integration**: WBS element names now directly correspond to activity template categories
 
-### 🔧 **Equipment Relationship Format**
-**Previous Structure (v2.x):**
+### 🔧 **Perfect Balance: Clarity + Functionality**
+
+**Hybrid Structure Example:**
+```
++UH01                             ← Parent equipment
+├── +UH01 Feeder Protection       ← Generic subcategory (clarity for users)
+│   ├── +UH01 - -F01              ← Direct naming (activity template alignment)
+│   └── +UH01 - -F02              ← Direct naming (activity template alignment)
+├── +UH01 Network Devices         ← Generic subcategory (clarity for users)
+│   └── +UH01 - -Y01              ← Direct naming (activity template alignment)
+└── +UH01 Control Devices         ← Generic subcategory (clarity for users)
+    └── +UH01 - -KF01             ← Direct naming (activity template alignment)
+```
+
+### 📋 **Key Advantages of Hybrid Approach**
+1. **User-Friendly Navigation**: Generic subcategories help non-electrical experts understand equipment organization
+2. **Activity Template Ready**: Direct naming format (`+UH01 - -F01`) maps perfectly to activity libraries
+3. **P6 Dual-Import Optimized**: Clean separation between WBS structure and activity assignment
+4. **Template Consistency**: Standardized naming supports activity template reuse across projects
+
+## Overview
+
+The WBS Generator streamlines the creation of work breakdown structures for electrical commissioning projects by:
+- Processing equipment lists from CSV, Excel (.xlsx), or JSON files
+- Automatically categorizing equipment by type with **generic subcategories for clarity**
+- Generating **direct parent-child naming format** for perfect activity template alignment
+- Creating standardized FAT (Factory Acceptance Test) and SAT (Site Acceptance Test) structures
+- Producing P6-compatible CSV files with **activity-template-ready WBS codes**
+- Supporting seamless integration with activity template libraries
+
+## How It Works
+
+### 1. **Input: Equipment List**
+The generator processes equipment lists with the following required columns:
+- `Parent Equipment Number` - References parent equipment (use "-" for root-level equipment)
+- `Equipment Number` - Unique equipment identifier/tag
+- `PLU` - Product Line Unit category
+- `Description` - Equipment description
+
+**Example Equipment List:**
+```
+Parent Equipment Number | Equipment Number | PLU              | Description
+-                      | +UH01            | Protection Panel | 33kV Protection Panel #1
++UH01                  | +UH01-F01        | Feeder Prot      | Feeder Protection Device #1
++UH01                  | +UH01-F02        | Feeder Prot      | Feeder Protection Device #2
++UH01                  | +UH01-KF01       | Control Device   | Control Device #1
+-                      | +WA10            | HV Switchboard   | 33kV Main Switchboard
++WA10-A01              | CB10             | Circuit Breaker  | 630A Circuit Breaker
++WA10-A01              | CT10             | Current Trans    | Current Transformer
+```
+
+### 2. **Processing: Hybrid Equipment Organization**
+The generator creates a two-level organization system:
+
+| Equipment Code | **Generic Subcategory** | **Direct Child Format** | **Activity Template Mapping** |
+|---|---|---|---|
+| `+UH` | "Feeder Protection" | `+UH01 - -F01` | Maps to `-F` activities (28 activities) |
+| `+UH` | "Control Devices" | `+UH01 - -KF01` | Maps to `-KF` activities (3 activities) |
+| `+UH` | "Network Devices" | `+UH01 - -Y01` | Maps to `-Y` activities (16 activities) |
+| `+WA` | "Circuit Breakers" | `+WA10 - CB01` | Maps to `CB` activities |
+| `+WA` | "Current Transformers" | `+WA10 - CT01` | Maps to `CT` activities |
+| `+WA` | "Voltage Transformers" | `+WA10 - VT01` | Maps to `VT` activities |
+| `+WC` | "Protection Devices" | `+WC01 - D01` | Maps to protection activities |
+| `+WC` | "Current Transformers" | `+WC01 - CT01` | Maps to `CT` activities |
+
+### 3. **Output: Hybrid WBS Structure**
+
+**Complete Example Structure:**
+```
+1 | Sample Commissioning Project
+2 |   FAT
+7 |     FAT - Protection Panels
+275 |       +UH01
+276 |         +UH01 Feeder Protection        ← Generic subcategory
+277 |           +UH01 - -F01                 ← Direct naming for activity mapping
+278 |           +UH01 - -F02                 ← Direct naming for activity mapping
+279 |         +UH01 Control Devices          ← Generic subcategory
+280 |           +UH01 - -KF01                ← Direct naming for activity mapping
+281 |         +UH01 Network Devices          ← Generic subcategory
+282 |           +UH01 - -Y01                 ← Direct naming for activity mapping
+283 |       +UH02
+284 |         +UH02 Feeder Protection        ← Generic subcategory
+285 |           +UH02 - -F01                 ← Direct naming for activity mapping
+8 |     FAT - HV Switchboards
+35 |       +WA10
+36 |         +WA10 Tiers                     ← Unique tier naming
+37 |           +WA10 Circuit Breakers        ← Generic subcategory
+38 |             +WA10 - CB01                ← Direct naming for activity mapping
+39 |             +WA10 - CB02                ← Direct naming for activity mapping
+40 |           +WA10 Current Transformers    ← Generic subcategory
+41 |             +WA10 - CT01                ← Direct naming for activity mapping
+42 |           +WA10 Voltage Transformers    ← Generic subcategory
+43 |             +WA10 - VT01                ← Direct naming for activity mapping
+```
+
+## Key Features
+
+### 🔧 **Hybrid Equipment Processing**
+- **Multi-format Support**: Import CSV, Excel (.xlsx), and JSON files
+- **Intelligent Categorization**: Creates generic subcategories for user navigation
+- **Smart Naming Extraction**: Automatically formats direct parent-child names for activity alignment
+- **Duplicate Prevention**: Unique naming system prevents P6 import conflicts
+- **Activity Template Ready**: WBS codes designed for seamless activity mapping
+
+### 📊 **Dual-Purpose Structure**
+- **User Navigation**: Generic subcategories make equipment easy to find and understand
+- **System Integration**: Direct naming format enables perfect activity template mapping
+- **Consistent Framework**: Every project gets the same hybrid base structure
+- **Dual Testing Phases**: Separate FAT and SAT structures for each equipment category
+- **P6 Optimized**: Structure designed for efficient P6 dual-import workflow
+
+### 📤 **Activity-Template-Ready Export**
+- **WBS CSV Format**: Direct import into Primavera P6 for WBS structure
+- **Activity Mapping Codes**: WBS element names correspond directly to activity template categories
+- **Unique WBS IDs**: Sequential numbering for each WBS element
+- **Parent References**: Proper hierarchical structure maintained
+- **Template Integration**: Perfect foundation for activity template import
+
+## Activity Template Integration
+
+### **Direct Mapping Examples**
+The hybrid structure creates perfect 1:1 mapping between WBS elements and activity templates:
+
+| **WBS Element** | **Activity Template** | **Standard Activities** |
+|---|---|---|
+| `+UH01 - -F01` | `-F` Template | 28 activities (testing, settings, documentation) |
+| `+UH01 - -KF01` | `-KF` Template | 3 activities (I/O, settings, labeling) |
+| `+UH01 - -Y01` | `-Y` Template | 16 activities (documentation, configuration) |
+| `+WA10 - CB01` | `CB` Template | Circuit breaker specific activities |
+| `+WC01 - CT01` | `CT` Template | Current transformer activities |
+
+### **P6 Workflow Integration**
+1. **WBS Import**: Import generated WBS structure CSV into P6
+2. **Activity Template Import**: Import activities using WBS codes for assignment
+3. **Template Reuse**: Copy standardized activity sets between similar equipment
+4. **Project Scaling**: Use same activity templates across multiple projects
+
+## Hybrid Structure Benefits
+
+### **For Non-Technical Users**
+- **Clear Navigation**: Generic subcategories like "Feeder Protection" are immediately understandable
+- **Logical Grouping**: Equipment organized by function rather than just codes
+- **Reduced Learning Curve**: Familiar terminology reduces training requirements
+
+### **For Technical Integration**
+- **Perfect Activity Mapping**: Direct naming format aligns with activity template libraries
+- **System Compatibility**: WBS codes designed for automated activity assignment
+- **Template Standardization**: Consistent naming enables activity template reuse
+
+### **For Project Management**
+- **Dual Import Ready**: Optimized for P6's separate WBS and activity import processes
+- **Template Library Support**: Foundation for standardized activity libraries
+- **Cross-Project Consistency**: Same hybrid structure across all commissioning projects
+
+## Usage
+
+### Step 1: Prepare Equipment List
+Create a spreadsheet with your equipment data:
+- Use "-" for root-level equipment (no parent)
+- Follow standard electrical naming conventions
+- Include complete parent-child relationships
+
+### Step 2: Upload and Process
+1. Open the WBS Generator application
+2. Click "Choose File" and select your equipment list
+3. Enter your project name
+4. Click "Generate WBS Structure"
+
+### Step 3: Review and Export
+1. Review the generated hybrid WBS structure
+2. Download the CSV file for P6 WBS import
+3. Note the activity-template-ready naming format
+
+### Step 4: Activity Template Integration
+1. Import WBS structure into P6
+2. Use WBS element names to map activity templates
+3. Import activities using standardized templates
+4. Replicate across similar equipment types
+
+## Output Format
+
+The generator produces a CSV file optimized for P6 import and activity template mapping:
+
+| Column | Description | Example |
+|---|---|---|
+| `WBS ID` | Unique WBS identifier | 277 |
+| `Parent WBS` | Parent WBS reference | 276 |
+| `WBS` | Hybrid WBS element name | +UH01 - -F01 |
+
+**Sample Output with Hybrid Structure:**
+```csv
+WBS ID,Parent WBS,WBS
+275,,+UH01
+276,275,+UH01 Feeder Protection
+277,276,+UH01 - -F01
+278,276,+UH01 - -F02
+279,275,+UH01 Control Devices
+280,279,+UH01 - -KF01
+```
+
+## Equipment Naming Conventions
+
+The hybrid approach works optimally with standard electrical naming conventions:
+
+### Protection Panels (`+UH##`)
 ```
 +UH01
-├── Feeder Protection     ← Generic subcategory (removed)
-│   ├── +UH01-F01
-│   └── +UH01-F02
-└── Control Devices       ← Generic subcategory (removed)
-    └── +UH01-KF01
+├── +UH01 Feeder Protection
+│   ├── +UH01 - -F01          ← Maps to -F activity template
+│   └── +UH01 - -F02          ← Maps to -F activity template
+├── +UH01 Control Devices
+│   └── +UH01 - -KF01         ← Maps to -KF activity template
+└── +UH01 Network Devices
+    └── +UH01 - -Y01          ← Maps to -Y activity template
 ```
 
-**New Structure (v3.0):**
+### HV Switchboards (`+WA##`)
 ```
-+UH01
-├── +UH01 - -F01         ← Direct parent-child relationship
-├── +UH01 - -F02         ← Direct parent-child relationship
-└── +UH01 - -KF01        ← Direct parent-child relationship
++WA10
+└── +WA10 Tiers
+    ├── +WA10 Circuit Breakers
+    │   ├── +WA10 - CB01      ← Maps to CB activity template
+    │   └── +WA10 - CB02      ← Maps to CB activity template
+    ├── +WA10 Current Transformers
+    │   └── +WA10 - CT01      ← Maps to CT activity template
+    └── +WA10 Voltage Transformers
+        └── +WA10 - VT01      ← Maps to VT activity template
 ```
 
-### 📋 **Benefits for Activity Management**
-- **Perfect P6 Alignment**: WBS codes now match activity template structure exactly
-- **Activity Import Ready**: Each WBS element has a clear corresponding activity template
-- **Simplified Mapping**: Direct 1:1 relationship between WBS items and activity categories
-- **Template Consistency**: Supports standardized activity libraries for different equipment types
+## Version 3.1 Advantages
+
+### **Hybrid Structure Benefits**
+- **User Clarity**: Generic subcategories provide immediate context and understanding
+- **System Integration**: Direct naming format enables perfect activity template mapping
+- **Navigation Efficiency**: Users can quickly locate equipment by function
+- **Template Consistency**: Standardized naming supports activity library reuse
+
+### **Activity Template Optimization**
+- **Direct Mapping**: WBS element names correspond exactly to activity template categories
+- **Import Efficiency**: Activity templates can be automatically assigned using WBS codes
+- **Cross-Project Reuse**: Same activity templates work across all projects using this structure
+- **Standardization**: Consistent approach to activity assignment and template management
+
+### **P6 Integration Excellence**
+- **Dual Import Support**: Optimized for P6's separate WBS and activity import processes
+- **Clean Structure**: Hierarchical organization supports clear project visualization
+- **Template Foundation**: Perfect base for activity template library implementation
+- **Scalability**: Structure supports projects of any size while maintaining consistency
+
+## Technical Specifications
+
+- **Input Formats**: CSV, Excel (.xlsx), JSON
+- **Output Formats**: CSV (P6-compatible), JSON
+- **Structure Type**: Hybrid (Generic Subcategories + Direct Naming)
+- **Activity Template Ready**: Yes - Direct WBS-to-template mapping
+- **Browser Support**: Modern browsers with JavaScript enabled
+- **File Size Limit**: Handles equipment lists up to 1000+ items
+- **Processing Time**: Typically under 5 seconds for standard projects
+
+## Troubleshooting
+
+### Common Issues
+
+**Generic Subcategories Not Appearing**
+- Verify equipment follows standard naming conventions (+UH, +WA, +WC, etc.)
+- Check that parent-child relationships are correctly defined
+- Ensure equipment types are properly identified
+
+**Activity Template Mapping Issues**
+- Confirm WBS element names use direct format (+UH01 - -F01)
+- Verify activity templates match expected naming patterns
+- Check that equipment codes align with activity template categories
+
+**P6 Import Problems**
+- Ensure CSV format matches P6 import requirements
+- Verify no duplicate WBS names exist at same hierarchical level
+- Check that WBS codes are compatible with activity assignment processes
+
+---
+
+*Generated by WBS Generator v3.1 - Hybrid Structure: Generic Subcategories for User Clarity + Direct Parent-Child Naming for Activity Template Integration*
 
 ## Overview
 
