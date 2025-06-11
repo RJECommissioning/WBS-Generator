@@ -829,17 +829,19 @@
             }
 
             addHvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+                console.log(`🔧 Processing HV Switchboard equipment for: ${parentCode}`);
+                
                 for (const sectionKey of ['fat_hv_switchboards', 'sat_hv_switchboards']) {
                     const parentId = this.keySections[sectionKey];
+                    const equipmentParentId = this.createWbsNode(parentCode, parentId);
                     
-                    // Create a unique "Tiers" node for each parent equipment under each section
-                    const tiersId = this.createUniqueWbsNode("Tiers", parentId, parentCode);
-                    const equipmentParentId = this.createWbsNode(parentCode, tiersId);
+                    // FIXED: Create unique "Tiers" name using parent equipment
+                    const tiersId = this.createUniqueWbsNode("Tiers", equipmentParentId, parentCode);
                     
-                    // Create unique subcategory names using parent equipment
-                    const cbId = this.createUniqueWbsNode("Circuit Breakers", equipmentParentId, parentCode);
-                    const ctId = this.createUniqueWbsNode("Current Transformers", equipmentParentId, parentCode);
-                    const vtId = this.createUniqueWbsNode("Voltage Transformers", equipmentParentId, parentCode);
+                    // FIXED: Create unique subcategory names using parent equipment
+                    const cbId = this.createUniqueWbsNode("Circuit Breakers", tiersId, parentCode);
+                    const ctId = this.createUniqueWbsNode("Current Transformers", tiersId, parentCode);
+                    const vtId = this.createUniqueWbsNode("Voltage Transformers", tiersId, parentCode);
                     
                     for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
                         let targetParent;
@@ -854,6 +856,84 @@
                             continue;
                         }
                             
+                        for (const eqItem of equipmentList) {
+                            const equipmentId = this.createWbsNode(eqItem.equipment, targetParent);
+                            this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
+                        }
+                    }
+                }
+            }
+
+            addProtectionPanelEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+                console.log(`🔧 Processing Protection Panel equipment for: ${parentCode}`);
+                
+                for (const sectionKey of ['fat_protection_panels', 'sat_protection_panels']) {
+                    const parentId = this.keySections[sectionKey];
+                    const equipmentParentId = this.createWbsNode(parentCode, parentId);
+                    
+                    // FIXED: Create unique subcategory names using parent equipment
+                    const feederProtId = this.createUniqueWbsNode("Feeder Protection", equipmentParentId, parentCode);
+                    const networkDevId = this.createUniqueWbsNode("Network Devices", equipmentParentId, parentCode);
+                    const controlDevId = this.createUniqueWbsNode("Control Devices", equipmentParentId, parentCode);
+                    
+                    for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                        console.log(`  Processing ${equipmentList.length} items of type ${eqType} under ${parentCode}`);
+                        
+                        let targetParent;
+                        
+                        if (eqType === '-F') {
+                            targetParent = feederProtId;
+                        } else if (eqType === '-Y') {
+                            targetParent = networkDevId;
+                        } else if (eqType === '-KF') {
+                            targetParent = controlDevId;
+                        } else {
+                            continue;
+                        }
+                        
+                        for (const eqItem of equipmentList) {
+                            // BLOCK ALL KF11 EQUIPMENT FROM BEING ADDED
+                            if (eqItem.equipment.includes('-KF11')) {
+                                console.log(`🚫 BLOCKING KF11 in Protection Panel: ${eqItem.equipment}`);
+                                continue;
+                            }
+                            
+                            const equipmentId = this.createWbsNode(eqItem.equipment, targetParent);
+                            
+                            // PREVENT KF11 from having nested children
+                            if (!eqItem.equipment.includes('-KF11')) {
+                                this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups, 0);
+                            } else {
+                                console.log(`🚫 PREVENTING KF11 nested children: ${eqItem.equipment}`);
+                            }
+                        }
+                    }
+                }
+            }
+
+            addLvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+                for (const sectionKey of ['fat_lv_switchboards', 'sat_lv_switchboards']) {
+                    const parentId = this.keySections[sectionKey];
+                    const equipmentParentId = this.createWbsNode(parentCode, parentId);
+                    
+                    // FIXED: Create unique subcategory names using parent equipment
+                    const protId = this.createUniqueWbsNode("Protection Devices", equipmentParentId, parentCode);
+                    const meterId = this.createUniqueWbsNode("Metering Devices", equipmentParentId, parentCode);
+                    const ctId = this.createUniqueWbsNode("Current Transformers", equipmentParentId, parentCode);
+                    
+                    for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                        let targetParent;
+                        
+                        if (['PROT', 'PROTECTION'].includes(eqType)) {
+                            targetParent = protId;
+                        } else if (['METER', 'METERING'].includes(eqType)) {
+                            targetParent = meterId;
+                        } else if (eqType === 'CT') {
+                            targetParent = ctId;
+                        } else {
+                            targetParent = meterId; // Default
+                        }
+                        
                         for (const eqItem of equipmentList) {
                             const equipmentId = this.createWbsNode(eqItem.equipment, targetParent);
                             this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
@@ -1002,15 +1082,15 @@
                     } else if (eqType === '+WA') {
                         for (const sectionKey of ['fat_hv_switchboards', 'sat_hv_switchboards']) {
                             const parentId = this.keySections[sectionKey];
+                            const equipmentId = this.createWbsNode(equipmentName, parentId);
                             
-                            // FIXED: Create unique "Tiers" name using equipment name
-                            const tiersId = this.createUniqueWbsNode("Tiers", parentId, equipmentName);
-                            const equipmentId = this.createWbsNode(equipmentName, tiersId);
+                            // FIXED: Create unique "Tiers" name using equipment name  
+                            const tiersId = this.createUniqueWbsNode("Tiers", equipmentId, equipmentName);
                             
                             // FIXED: Create unique subcategory names using equipment name
-                            this.createUniqueWbsNode("Circuit Breakers", equipmentId, equipmentName);
-                            this.createUniqueWbsNode("Current Transformers", equipmentId, equipmentName);
-                            this.createUniqueWbsNode("Voltage Transformers", equipmentId, equipmentName);
+                            this.createUniqueWbsNode("Circuit Breakers", tiersId, equipmentName);
+                            this.createUniqueWbsNode("Current Transformers", tiersId, equipmentName);
+                            this.createUniqueWbsNode("Voltage Transformers", tiersId, equipmentName);
                         }
                     } else if (eqType === 'T') {
                         for (const sectionKey of ['fat_transformers', 'sat_transformers']) {
