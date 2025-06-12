@@ -1032,7 +1032,7 @@
                 }
             }
 
-            addLvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+            addLvSwitchboardEquipment_UNUSED(parentCode, equipmentByType, allEquipmentGroups) {
                 for (const sectionKey of ['fat_lv_switchboards', 'sat_lv_switchboards']) {
                     const parentId = this.keySections[sectionKey];
                     const equipmentParentId = this.createWbsNode(parentCode, parentId);
@@ -1066,7 +1066,7 @@
                 }
             }
 
-            addHvSwitchboardEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+            addHvSwitchboardEquipment_UNUSED(parentCode, equipmentByType, allEquipmentGroups) {
                 console.log(`🔧 Processing HV Switchboard equipment for: ${parentCode}`);
                 
                 for (const sectionKey of ['fat_hv_switchboards', 'sat_hv_switchboards']) {
