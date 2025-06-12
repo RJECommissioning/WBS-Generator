@@ -825,33 +825,170 @@
                 console.log('Equipment groups to process:', Object.keys(equipmentGroups));
                 console.log('Orphan equipment to process:', orphanEquipment.length);
                 
-                // Handle equipment with parents (should be minimal now)
+                // v3.5 CRITICAL FIX: Only process orphan equipment (true roots)
+                // Equipment groups should only contain children of true roots, not the roots themselves
+                
+                // First, process all orphan equipment (true roots) - this creates the main structures
+                console.log('Processing orphan equipment (true roots) - FIRST PASS...');
+                this.addOrphanEquipment(orphanEquipment);
+                
+                // Then, add children to the already-created root structures
                 for (const [parentCode, equipmentByType] of Object.entries(equipmentGroups)) {
-                    console.log(`Processing parent: ${parentCode}`);
+                    console.log(`Adding children to existing parent: ${parentCode}`);
                     const parentType = this.identifyEquipmentType(parentCode);
-                    console.log(`  Parent type identified as: ${parentType}`);
                     
+                    // These methods should add to EXISTING structures, not create new ones
                     if (parentType === '+UH') {
-                        this.addProtectionPanelEquipment(parentCode, equipmentByType, equipmentGroups);
+                        this.addChildrenToProtectionPanels(parentCode, equipmentByType, equipmentGroups);
                     } else if (parentType === '+WC') {
-                        this.addLvSwitchboardEquipment(parentCode, equipmentByType, equipmentGroups);
+                        this.addChildrenToLvSwitchboards(parentCode, equipmentByType, equipmentGroups);
                     } else if (parentType === '+WA') {
-                        this.addHvSwitchboardEquipment(parentCode, equipmentByType, equipmentGroups);
+                        this.addChildrenToHvSwitchboards(parentCode, equipmentByType, equipmentGroups);
                     } else if (['-F', '-KF', '-Y', 'CB', 'CT', 'VT'].includes(parentType)) {
                         this.addChildEquipment(parentCode, equipmentByType, equipmentGroups);
                     } else {
-                        this.addToAncillary(parentCode, equipmentByType);
+                        console.log(`Skipping unrecognized parent type: ${parentType} for ${parentCode}`);
                     }
                 }
-                
-                // Handle orphan equipment (should be most equipment now)
-                console.log('Processing orphan equipment (true roots)...');
-                this.addOrphanEquipment(orphanEquipment);
                 
                 console.log(`✅ v3.5 FINAL: Total WBS nodes after equipment: ${this.wbsStructure.length}`);
             }
 
-            addProtectionPanelEquipment(parentCode, equipmentByType, allEquipmentGroups) {
+            // NEW v3.5: Methods to add children to EXISTING parent structures (no duplication)
+            addChildrenToProtectionPanels(parentCode, equipmentByType, allEquipmentGroups) {
+                console.log(`🔧 Adding children to EXISTING Protection Panel: ${parentCode}`);
+                
+                // Find the existing parent structures
+                const existingParents = this.wbsStructure.filter(node => node.WBS === parentCode);
+                
+                for (const parentNode of existingParents) {
+                    const parentWbsId = parentNode['WBS ID'];
+                    
+                    // Find the existing subcategories
+                    const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
+                    const feederProtNode = existingChildren.find(node => node.WBS.includes('Feeder Protection'));
+                    const networkDevNode = existingChildren.find(node => node.WBS.includes('Network Devices'));
+                    const controlDevNode = existingChildren.find(node => node.WBS.includes('Control Devices'));
+                    
+                    if (feederProtNode || networkDevNode || controlDevNode) {
+                        for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                            let targetParent;
+                            
+                            if (eqType === '-F' && feederProtNode) {
+                                targetParent = feederProtNode['WBS ID'];
+                            } else if (eqType === '-Y' && networkDevNode) {
+                                targetParent = networkDevNode['WBS ID'];
+                            } else if (eqType === '-KF' && controlDevNode) {
+                                targetParent = controlDevNode['WBS ID'];
+                            } else {
+                                continue;
+                            }
+                            
+                            for (const eqItem of equipmentList) {
+                                if (eqItem.equipment.includes('-KF11')) {
+                                    console.log(`🚫 BLOCKING KF11: ${eqItem.equipment}`);
+                                    continue;
+                                }
+                                
+                                const immediateParent = eqItem.immediateParent || parentCode;
+                                const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
+                                const formattedChildName = `${immediateParent} - ${childEquipmentCode}`;
+                                
+                                const equipmentId = this.createWbsNode(formattedChildName, targetParent);
+                                
+                                if (!eqItem.equipment.includes('-KF11')) {
+                                    this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups, 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            addChildrenToLvSwitchboards(parentCode, equipmentByType, allEquipmentGroups) {
+                console.log(`🔧 Adding children to EXISTING LV Switchboard: ${parentCode}`);
+                
+                const existingParents = this.wbsStructure.filter(node => node.WBS === parentCode);
+                
+                for (const parentNode of existingParents) {
+                    const parentWbsId = parentNode['WBS ID'];
+                    const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
+                    
+                    const protNode = existingChildren.find(node => node.WBS.includes('Protection Devices'));
+                    const meterNode = existingChildren.find(node => node.WBS.includes('Metering Devices'));
+                    const ctNode = existingChildren.find(node => node.WBS.includes('Current Transformers'));
+                    
+                    if (protNode || meterNode || ctNode) {
+                        for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                            let targetParent;
+                            
+                            if (['PROT', 'PROTECTION'].includes(eqType) && protNode) {
+                                targetParent = protNode['WBS ID'];
+                            } else if (['METER', 'METERING'].includes(eqType) && meterNode) {
+                                targetParent = meterNode['WBS ID'];
+                            } else if (eqType === 'CT' && ctNode) {
+                                targetParent = ctNode['WBS ID'];
+                            } else if (meterNode) {
+                                targetParent = meterNode['WBS ID']; // Default
+                            } else {
+                                continue;
+                            }
+                            
+                            for (const eqItem of equipmentList) {
+                                const immediateParent = eqItem.immediateParent || parentCode;
+                                const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
+                                const formattedChildName = `${immediateParent} - ${childEquipmentCode}`;
+                                
+                                const equipmentId = this.createWbsNode(formattedChildName, targetParent);
+                                this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
+                            }
+                        }
+                    }
+                }
+            }
+
+            addChildrenToHvSwitchboards(parentCode, equipmentByType, allEquipmentGroups) {
+                console.log(`🔧 Adding children to EXISTING HV Switchboard: ${parentCode}`);
+                
+                const existingParents = this.wbsStructure.filter(node => node.WBS === parentCode);
+                
+                for (const parentNode of existingParents) {
+                    const parentWbsId = parentNode['WBS ID'];
+                    const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
+                    
+                    // Find the Tiers node
+                    const tiersNode = existingChildren.find(node => node.WBS.includes('Tiers'));
+                    if (tiersNode) {
+                        const tiersChildren = this.wbsStructure.filter(node => node['Parent WBS'] === tiersNode['WBS ID']);
+                        const cbNode = tiersChildren.find(node => node.WBS.includes('Circuit Breakers'));
+                        const ctNode = tiersChildren.find(node => node.WBS.includes('Current Transformers'));
+                        const vtNode = tiersChildren.find(node => node.WBS.includes('Voltage Transformers'));
+                        
+                        for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
+                            let targetParent;
+                            
+                            if (eqType === 'CB' && cbNode) {
+                                targetParent = cbNode['WBS ID'];
+                            } else if (eqType === 'CT' && ctNode) {
+                                targetParent = ctNode['WBS ID'];
+                            } else if (eqType === 'VT' && vtNode) {
+                                targetParent = vtNode['WBS ID'];
+                            } else {
+                                continue;
+                            }
+                                
+                            for (const eqItem of equipmentList) {
+                                const immediateParent = eqItem.immediateParent || parentCode;
+                                const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
+                                const formattedChildName = `${immediateParent} - ${childEquipmentCode}`;
+                                
+                                const equipmentId = this.createWbsNode(formattedChildName, targetParent);
+                                this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
+                            }
+                        }
+                    }
+                }
+            }
                 console.log(`🔧 Processing Protection Panel equipment for: ${parentCode}`);
                 
                 for (const sectionKey of ['fat_protection_panels', 'sat_protection_panels']) {
