@@ -317,7 +317,7 @@
                     <h3>Upload Equipment List</h3>
                     <p>Support for CSV, Excel (.xlsx), and JSON files</p>
                     <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.json" />
-                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click(); console.log('Upload button clicked');">
                         Choose File
                     </button>
                     <div class="file-info" id="fileInfo"></div>
@@ -1227,24 +1227,51 @@
             }
         }
 
-        // File handling functions
-        document.getElementById('fileInput').addEventListener('change', function(event) {
-            const file = event.target.files[0];
-            if (file) {
-                currentFile = file;
-                displayFileInfo(file);
-                document.getElementById('processBtn').disabled = false;
+        // File handling functions - Fixed for v3.5
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('fileInput');
+            const processBtn = document.getElementById('processBtn');
+            
+            if (fileInput) {
+                fileInput.addEventListener('change', function(event) {
+                    console.log('File input change event triggered');
+                    const file = event.target.files[0];
+                    console.log('Selected file:', file);
+                    
+                    if (file) {
+                        currentFile = file;
+                        displayFileInfo(file);
+                        if (processBtn) {
+                            processBtn.disabled = false;
+                        }
+                        console.log('File successfully selected:', file.name);
+                    } else {
+                        console.log('No file selected');
+                        if (processBtn) {
+                            processBtn.disabled = true;
+                        }
+                    }
+                });
+            } else {
+                console.error('File input element not found');
             }
         });
 
         function displayFileInfo(file) {
+            console.log('Displaying file info for:', file.name);
             const fileInfo = document.getElementById('fileInfo');
-            fileInfo.innerHTML = `
-                <strong>File:</strong> ${file.name}<br>
-                <strong>Size:</strong> ${(file.size / 1024).toFixed(2)} KB<br>
-                <strong>Type:</strong> ${file.type || 'Unknown'}
-            `;
-            fileInfo.style.display = 'block';
+            if (fileInfo) {
+                fileInfo.innerHTML = `
+                    <strong>File:</strong> ${file.name}<br>
+                    <strong>Size:</strong> ${(file.size / 1024).toFixed(2)} KB<br>
+                    <strong>Type:</strong> ${file.type || 'Unknown'}<br>
+                    <strong>Last Modified:</strong> ${new Date(file.lastModified).toLocaleDateString()}
+                `;
+                fileInfo.style.display = 'block';
+                console.log('File info displayed successfully');
+            } else {
+                console.error('File info element not found');
+            }
         }
 
         function showError(message) {
@@ -1383,6 +1410,177 @@
                 !wbsData.some(other => other['Parent WBS'] === node['WBS ID'])
             ).length;
 
-node => 
+            // Calculate performance metrics
+            const equipmentItems = generator ? generator.wbsStructure.filter(node => 
                 node.WBS.match(/^\+[A-Z]+\d+$/) || node.WBS.match(/^T\d+$/)
-            ).length / 2
+            ).length / 2 : 0;
+            
+            const nodesPerEquipment = equipmentItems > 0 ? (totalNodes / equipmentItems).toFixed(1) : 0;
+            
+            // Determine performance status
+            let performanceClass = 'excellent';
+            let performanceMessage = 'Excellent - Optimized structure achieved!';
+            
+            if (nodesPerEquipment > 15) {
+                performanceClass = 'needs-improvement';
+                performanceMessage = 'Needs Improvement - High node count detected. Consider reviewing equipment hierarchy.';
+            } else if (nodesPerEquipment > 12) {
+                performanceClass = 'good';
+                performanceMessage = 'Good - Structure is acceptable but could be optimized further.';
+            }
+
+            statsDiv.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${totalNodes}</div>
+                    <div class="stat-label">Total Nodes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${equipmentItems}</div>
+                    <div class="stat-label">Equipment Items</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${nodesPerEquipment}</div>
+                    <div class="stat-label">Nodes per Equipment</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${leafNodes}</div>
+                    <div class="stat-label">Activity Points</div>
+                </div>
+            `;
+
+            // Update performance indicator
+            performanceDiv.className = `performance-indicator ${performanceClass}`;
+            performanceText.textContent = performanceMessage;
+
+            let previewText = 'WBS Structure Preview (v3.5 Optimized):\n\n';
+            
+            function getLevel(nodeId) {
+                const node = wbsData.find(n => n['WBS ID'] === nodeId);
+                if (!node || node['Parent WBS'] === null) return 0;
+                return 1 + getLevel(node['Parent WBS']);
+            }
+
+            for (const node of wbsData.slice(0, 50)) {
+                const level = getLevel(node['WBS ID']);
+                const indent = '  '.repeat(level);
+                previewText += `${node['WBS ID'].toString().padStart(3)} | ${indent}${node['WBS']}\n`;
+            }
+
+            if (wbsData.length > 50) {
+                previewText += `\n... and ${wbsData.length - 50} more nodes`;
+            }
+
+            previewDiv.textContent = previewText;
+            resultsSection.style.display = 'block';
+        }
+
+        function downloadCSV() {
+            if (!wbsData) {
+                showError('No WBS data to download');
+                return;
+            }
+
+            const csvContent = convertToCSV(wbsData);
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'wbs_structure_v35_optimized.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showSuccess('v3.5 Optimized P6-compatible CSV file downloaded successfully');
+        }
+
+        function downloadJSON() {
+            if (!wbsData) {
+                showError('No WBS data to download');
+                return;
+            }
+
+            const jsonContent = JSON.stringify(wbsData, null, 2);
+            const blob = new Blob([jsonContent], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'wbs_structure_v35_optimized.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showSuccess('v3.5 Optimized JSON file downloaded successfully');
+        }
+
+        function convertToCSV(data) {
+            if (!data || data.length === 0) return '';
+            
+            // P6 API Compatible headers
+            const headers = ['wbs_code', 'parent_wbs_code', 'wbs_name'];
+            const csvRows = [];
+            
+            csvRows.push(headers.join(','));
+            
+            for (const row of data) {
+                const values = headers.map(header => {
+                    let value;
+                    
+                    if (header === 'wbs_code') {
+                        value = row['WBS ID'];
+                    } else if (header === 'parent_wbs_code') {
+                        value = row['Parent WBS'];
+                    } else if (header === 'wbs_name') {
+                        value = row['WBS'];
+                    }
+                    
+                    if (value === null || value === undefined) {
+                        return '';
+                    }
+                    
+                    const stringValue = String(value);
+                    if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                        return `"${stringValue.replace(/"/g, '""')}"`;
+                    }
+                    return stringValue;
+                });
+                csvRows.push(values.join(','));
+            }
+            
+            return csvRows.join('\n');
+        }
+
+        console.log('WBS Generator v3.5 Loaded - Optimized Performance + 100% Equipment Coverage');
+        
+        // Additional debugging for file upload issues
+        window.addEventListener('load', function() {
+            console.log('Page fully loaded');
+            const fileInput = document.getElementById('fileInput');
+            const processBtn = document.getElementById('processBtn');
+            const fileInfo = document.getElementById('fileInfo');
+            
+            console.log('Elements found:', {
+                fileInput: !!fileInput,
+                processBtn: !!processBtn,
+                fileInfo: !!fileInfo
+            });
+            
+            if (fileInput) {
+                console.log('File input accept attribute:', fileInput.accept);
+                console.log('File input multiple attribute:', fileInput.multiple);
+            }
+        });
+        
+        // Global error handler to catch any JavaScript errors
+        window.addEventListener('error', function(event) {
+            console.error('JavaScript error detected:', event.error);
+            console.error('Error message:', event.message);
+            console.error('Error filename:', event.filename);
+            console.error('Error line:', event.lineno);
+        });
+    </script>
+</body>
+</html>
