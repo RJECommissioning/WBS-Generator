@@ -327,7 +327,7 @@
                     
                     <div style="margin-top: 20px;">
                         <button class="download-btn" onclick="downloadCSV()">
-                            📥 Download CSV
+                            📥 Download P6-Compatible CSV
                         </button>
                         <button class="download-btn" onclick="downloadJSON()">
                             📋 Download JSON
@@ -1479,13 +1479,13 @@
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'wbs_structure.csv';
+            a.download = 'wbs_structure_p6_compatible.csv';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             
-            showSuccess('CSV file downloaded successfully');
+            showSuccess('P6-compatible CSV file downloaded successfully');
         }
 
         function downloadJSON() {
@@ -1512,16 +1512,31 @@
         function convertToCSV(data) {
             if (!data || data.length === 0) return '';
             
-            // Only export the 3 essential columns
-            const headers = ['WBS ID', 'Parent WBS', 'WBS'];
+            // P6 API Compatible headers (Updated for P6 integration)
+            const headers = ['wbs_code', 'parent_wbs_code', 'wbs_name'];
             const csvRows = [];
             
             csvRows.push(headers.join(','));
             
             for (const row of data) {
                 const values = headers.map(header => {
-                    const value = row[header];
-                    if (value === null || value === undefined) return '';
+                    let value;
+                    
+                    // Map WBS Generator columns to P6 API columns
+                    if (header === 'wbs_code') {
+                        value = row['WBS ID'];
+                    } else if (header === 'parent_wbs_code') {
+                        value = row['Parent WBS'];
+                    } else if (header === 'wbs_name') {
+                        value = row['WBS'];
+                    }
+                    
+                    // Handle null/undefined values for P6 compatibility
+                    if (value === null || value === undefined) {
+                        return '';
+                    }
+                    
+                    // Convert to string and handle CSV formatting
                     const stringValue = String(value);
                     if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
                         return `"${stringValue.replace(/"/g, '""')}"`;
