@@ -406,6 +406,38 @@
                     console.log('First equipment item (raw):', equipmentData[0]);
                 }
                 
+                // STEP 1: Identify true root equipment (main parents that should get their own sections)
+                const trueRootEquipment = new Set();
+                const allEquipmentCodes = new Set();
+                
+                // Collect all equipment codes first
+                for (const item of equipmentData) {
+                    const equipment = this.extractEquipment(item);
+                    if (equipment) {
+                        allEquipmentCodes.add(equipment);
+                    }
+                }
+                
+                // Identify true root equipment - items that are not children of other equipment in the list
+                for (const item of equipmentData) {
+                    const parent = this.extractParent(item);
+                    const equipment = this.extractEquipment(item);
+                    
+                    if (!equipment) continue;
+                    
+                    // If parent is "-" or not in our equipment list, this is a true root
+                    if (!parent || parent === '-' || !allEquipmentCodes.has(parent)) {
+                        const equipmentType = this.identifyEquipmentType(equipment);
+                        if (equipmentType && ['+UH', '+WA', '+WC'].includes(equipmentType)) {
+                            trueRootEquipment.add(equipment);
+                            console.log(`✅ True root equipment identified: ${equipment} (${equipmentType})`);
+                        }
+                    }
+                }
+                
+                console.log('True root equipment found:', Array.from(trueRootEquipment));
+                
+                // STEP 2: Process equipment relationships, but ONLY create parent sections for true roots
                 for (const item of equipmentData) {
                     const parent = this.extractParent(item);
                     const equipment = this.extractEquipment(item);
@@ -416,6 +448,7 @@
                         continue;
                     }
                     
+                    // Check if this equipment should be an orphan (true root with no parent)
                     if (!parent || parent === '-') {
                         const equipmentType = this.identifyEquipmentType(equipment);
                         orphanEquipment.push({
@@ -424,10 +457,10 @@
                             plu_name: pluName,
                             parent: null
                         });
+                        console.log(`📦 Orphan equipment: ${equipment} (${equipmentType})`);
                     } else {
                         // AGGRESSIVE KF11 FILTERING - Skip ALL KF11 sibling relationships
                         if (parent.includes('-KF11') && equipment.includes('-KF11')) {
-                            // Only allow direct parent-child like -KF11 -> -KF11-B
                             if (!equipment.startsWith(parent + '-')) {
                                 console.log(`🚫 SKIPPING KF11 SIBLING: ${parent} -> ${equipment}`);
                                 skippedRelationships++;
@@ -442,37 +475,66 @@
                             continue;
                         }
                         
-                        // Skip any relationship where child contains parent name (circular pattern)
+                        // Skip circular patterns
                         if (equipment.includes(parent) && equipment !== parent && !equipment.startsWith(parent + '-')) {
                             console.log(`🚫 SKIPPING CIRCULAR PATTERN: ${parent} -> ${equipment}`);
                             skippedRelationships++;
                             continue;
                         }
                         
-                        if (!equipmentGroups[parent]) {
-                            equipmentGroups[parent] = {};
+                        // CRITICAL FIX: Only create parent equipment groups for TRUE ROOT equipment
+                        // Find the ultimate root parent for this relationship
+                        let ultimateParent = parent;
+                        let searchDepth = 0;
+                        const maxSearchDepth = 10;
+                        
+                        while (searchDepth < maxSearchDepth) {
+                            const parentItem = equipmentData.find(item => 
+                                this.extractEquipment(item) === ultimateParent
+                            );
+                            
+                            if (parentItem) {
+                                const grandParent = this.extractParent(parentItem);
+                                if (grandParent && grandParent !== '-' && allEquipmentCodes.has(grandParent)) {
+                                    ultimateParent = grandParent;
+                                    searchDepth++;
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
                         }
                         
-                        const equipmentType = this.determineChildEquipmentType(parent, equipment);
-                        
-                        if (!equipmentGroups[parent][equipmentType]) {
-                            equipmentGroups[parent][equipmentType] = [];
+                        // Only create equipment groups for true root parents
+                        if (trueRootEquipment.has(ultimateParent)) {
+                            if (!equipmentGroups[ultimateParent]) {
+                                equipmentGroups[ultimateParent] = {};
+                            }
+                            
+                            const equipmentType = this.determineChildEquipmentType(parent, equipment);
+                            
+                            if (!equipmentGroups[ultimateParent][equipmentType]) {
+                                equipmentGroups[ultimateParent][equipmentType] = [];
+                            }
+                            
+                            equipmentGroups[ultimateParent][equipmentType].push({
+                                equipment: equipment,
+                                plu_name: pluName,
+                                immediateParent: parent  // Keep track of immediate parent for naming
+                            });
+                            
+                            console.log(`🔗 Added to ${ultimateParent}: ${equipment} (type: ${equipmentType}, immediate parent: ${parent})`);
+                        } else {
+                            console.log(`⚠️  Skipping non-root parent: ${parent} -> ${equipment}`);
+                            skippedRelationships++;
                         }
-                        
-                        equipmentGroups[parent][equipmentType].push({
-                            equipment: equipment,
-                            plu_name: pluName
-                        });
                     }
                 }
                 
                 console.log('✅ Equipment groups found:', Object.keys(equipmentGroups).length);
                 console.log('✅ Orphan equipment found:', orphanEquipment.length);
-                console.log('🚫 Skipped problematic relationships:', skippedRelationships);
-                
-                // Log KF11 specific info
-                const kf11Groups = Object.keys(equipmentGroups).filter(key => key.includes('-KF11'));
-                console.log('🔧 KF11 parent groups:', kf11Groups.length);
+                console.log('🚫 Skipped problematic/non-root relationships:', skippedRelationships);
                 
                 return { equipmentGroups, orphanEquipment };
             }
@@ -776,7 +838,7 @@
                     const parentId = this.keySections[sectionKey];
                     const equipmentParentId = this.createWbsNode(parentCode, parentId);
                     
-                    // RESTORED: Create generic subcategories for clarity using unique names
+                    // Create generic subcategories for clarity using unique names
                     const feederProtId = this.createUniqueWbsNode("Feeder Protection", equipmentParentId, parentCode);
                     const networkDevId = this.createUniqueWbsNode("Network Devices", equipmentParentId, parentCode);
                     const controlDevId = this.createUniqueWbsNode("Control Devices", equipmentParentId, parentCode);
@@ -803,11 +865,13 @@
                                 continue;
                             }
                             
-                            // NEW: Use direct parent-child naming format
-                            const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, parentCode);
-                            const formattedChildName = `${parentCode} - ${childEquipmentCode}`;
+                            // FIXED: Use the immediate parent for proper naming
+                            const immediateParent = eqItem.immediateParent || parentCode;
+                            const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
+                            const formattedChildName = `${immediateParent} - ${childEquipmentCode}`;
                             
                             const equipmentId = this.createWbsNode(formattedChildName, targetParent);
+                            console.log(`✅ Created protection equipment: ${formattedChildName} under ${parentCode}`);
                             
                             // PREVENT KF11 from having nested children
                             if (!eqItem.equipment.includes('-KF11')) {
@@ -825,7 +889,7 @@
                     const parentId = this.keySections[sectionKey];
                     const equipmentParentId = this.createWbsNode(parentCode, parentId);
                     
-                    // RESTORED: Create generic subcategories for clarity using unique names
+                    // Create generic subcategories for clarity using unique names
                     const protId = this.createUniqueWbsNode("Protection Devices", equipmentParentId, parentCode);
                     const meterId = this.createUniqueWbsNode("Metering Devices", equipmentParentId, parentCode);
                     const ctId = this.createUniqueWbsNode("Current Transformers", equipmentParentId, parentCode);
@@ -844,11 +908,14 @@
                         }
                         
                         for (const eqItem of equipmentList) {
-                            // NEW: Use direct parent-child naming format
-                            const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, parentCode);
-                            const formattedChildName = `${parentCode} - ${childEquipmentCode}`;
+                            // FIXED: Use the immediate parent for proper naming
+                            const immediateParent = eqItem.immediateParent || parentCode;
+                            const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
+                            const formattedChildName = `${immediateParent} - ${childEquipmentCode}`;
                             
                             const equipmentId = this.createWbsNode(formattedChildName, targetParent);
+                            console.log(`✅ Created LV equipment: ${formattedChildName} under ${parentCode}`);
+                            
                             this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
                         }
                     }
@@ -862,10 +929,10 @@
                     const parentId = this.keySections[sectionKey];
                     const equipmentParentId = this.createWbsNode(parentCode, parentId);
                     
-                    // RESTORED: Create unique "Tiers" name using parent equipment
+                    // Create unique "Tiers" name using parent equipment
                     const tiersId = this.createUniqueWbsNode("Tiers", equipmentParentId, parentCode);
                     
-                    // RESTORED: Create generic subcategories for clarity using unique names
+                    // Create generic subcategories for clarity using unique names
                     const cbId = this.createUniqueWbsNode("Circuit Breakers", tiersId, parentCode);
                     const ctId = this.createUniqueWbsNode("Current Transformers", tiersId, parentCode);
                     const vtId = this.createUniqueWbsNode("Voltage Transformers", tiersId, parentCode);
@@ -884,11 +951,15 @@
                         }
                             
                         for (const eqItem of equipmentList) {
-                            // NEW: Use direct parent-child naming format
-                            const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, parentCode);
-                            const formattedChildName = `${parentCode} - ${childEquipmentCode}`;
+                            // FIXED: Use the immediate parent for proper naming
+                            const immediateParent = eqItem.immediateParent || parentCode;
+                            const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
+                            const formattedChildName = `${immediateParent} - ${childEquipmentCode}`;
                             
                             const equipmentId = this.createWbsNode(formattedChildName, targetParent);
+                            console.log(`✅ Created HV equipment: ${formattedChildName} under ${parentCode}`);
+                            
+                            // Continue processing any nested children
                             this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
                         }
                     }
