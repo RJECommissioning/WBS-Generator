@@ -371,7 +371,13 @@
                     '+CA': 'Capacitor Banks',
                     '+HN': 'Auxiliary Systems',
                     'D': 'Protection Devices',
-                    'E': 'Protection Devices'
+                    'E': 'Protection Devices',
+                    '+GB': 'Battery Systems',
+                    'FM': 'Fire Detection',
+                    'PC': 'Building Services',
+                    'ASDU': 'Fire Detection',
+                    'LOOP': 'Fire Detection',
+                    '-UC': 'DC Systems'
                 };
                 
                 this.equipmentPatterns = {
@@ -391,7 +397,13 @@
                     '\\+HN\\d+': 'Auxiliary Systems',
                     '^D\\d+': 'Protection Devices',
                     '^E\\d+': 'Protection Devices',
-                    'D\\d+\\s*/\\s*E\\d+': 'Protection Devices'
+                    'D\\d+\\s*/\\s*E\\d+': 'Protection Devices',
+                    '\\+GB\\d+': 'Battery Systems',
+                    '^FM\\d+': 'Fire Detection',
+                    '^PC\\d+': 'Building Services',
+                    '^ASDU\\d+': 'Fire Detection',
+                    '^LOOP\\d+': 'Fire Detection',
+                    '.*-UC\\d+': 'DC Systems'
                 };
             }
 
@@ -482,7 +494,6 @@
                             continue;
                         }
                         
-                        // CRITICAL FIX: Only create parent equipment groups for TRUE ROOT equipment
                         // Find the ultimate root parent for this relationship
                         let ultimateParent = parent;
                         let searchDepth = 0;
@@ -506,8 +517,12 @@
                             }
                         }
                         
-                        // Only create equipment groups for true root parents
-                        if (trueRootEquipment.has(ultimateParent)) {
+                        // Only create equipment groups for true root parents OR if this is a special case
+                        const isSpecialCategory = ['+CA', '+GB', 'FM', '+HN', 'PC', 'ASDU', 'LOOP', '-UC'].some(pattern => 
+                            equipment.startsWith(pattern)
+                        );
+                        
+                        if (trueRootEquipment.has(ultimateParent) || isSpecialCategory) {
                             if (!equipmentGroups[ultimateParent]) {
                                 equipmentGroups[ultimateParent] = {};
                             }
@@ -742,6 +757,7 @@
                 const fatBuildingId = this.createWbsNode("FAT - Building Services", fatId, "FAT_BLDG");
                 const fatInterfaceId = this.createWbsNode("FAT - Interface Testing", fatId, "FAT_INTFC");
                 const fatAncillaryId = this.createWbsNode("FAT - Ancillary Systems", fatId, "FAT_ANCIL");
+                const fatDcSystemsId = this.createWbsNode("FAT - DC Systems", fatId, "FAT_DC");
                 const fatTransformersId = this.createWbsNode("FAT - Transformers", fatId, "FAT_TRANS");
                 const fatProtectionId = this.createWbsNode("FAT - Protection Systems", fatId, "FAT_PROT_SYS");
                 
@@ -753,8 +769,13 @@
                 const satBuildingId = this.createWbsNode("SAT - Building Services", satId, "SAT_BLDG");
                 const satInterfaceId = this.createWbsNode("SAT - Interface Testing", satId, "SAT_INTFC");
                 const satAncillaryId = this.createWbsNode("SAT - Ancillary Systems", satId, "SAT_ANCIL");
+                const satDcSystemsId = this.createWbsNode("SAT - DC Systems", satId, "SAT_DC");
                 const satTransformersId = this.createWbsNode("SAT - Transformers", satId, "SAT_TRANS");
                 const satProtectionId = this.createWbsNode("SAT - Protection Systems", satId, "SAT_PROT_SYS");
+                
+                // DC Systems subcategories
+                const fatDcBatteryId = this.createWbsNode("Battery Systems", fatDcSystemsId);
+                const satDcBatteryId = this.createWbsNode("Battery Systems", satDcSystemsId);
                 
                 // Interface Testing phases
                 this.createWbsNode("Phase 1", fatInterfaceId);
@@ -786,6 +807,10 @@
                     'sat_interface': satInterfaceId,
                     'fat_ancillary': fatAncillaryId,
                     'sat_ancillary': satAncillaryId,
+                    'fat_dc_systems': fatDcSystemsId,
+                    'sat_dc_systems': satDcSystemsId,
+                    'fat_dc_battery': fatDcBatteryId,
+                    'sat_dc_battery': satDcBatteryId,
                     'fat_transformers': fatTransformersId,
                     'sat_transformers': satTransformersId,
                     'fat_protection': fatProtectionId,
@@ -1194,7 +1219,7 @@
                             const parentId = this.keySections[sectionKey];
                             const equipmentId = this.createWbsNode(equipmentName, parentId);
                             
-                            // RESTORED: Create generic subcategories for clarity
+                            // Create generic subcategories for clarity
                             this.createUniqueWbsNode("Feeder Protection", equipmentId, equipmentName);
                             this.createUniqueWbsNode("Network Devices", equipmentId, equipmentName);
                             this.createUniqueWbsNode("Control Devices", equipmentId, equipmentName);
@@ -1204,7 +1229,7 @@
                             const parentId = this.keySections[sectionKey];
                             const equipmentId = this.createWbsNode(equipmentName, parentId);
                             
-                            // RESTORED: Create generic subcategories for clarity
+                            // Create generic subcategories for clarity
                             this.createUniqueWbsNode("Protection Devices", equipmentId, equipmentName);
                             this.createUniqueWbsNode("Metering Devices", equipmentId, equipmentName);
                             this.createUniqueWbsNode("Current Transformers", equipmentId, equipmentName);
@@ -1214,10 +1239,10 @@
                             const parentId = this.keySections[sectionKey];
                             const equipmentId = this.createWbsNode(equipmentName, parentId);
                             
-                            // RESTORED: Create unique "Tiers" name using equipment name  
+                            // Create unique "Tiers" name using equipment name  
                             const tiersId = this.createUniqueWbsNode("Tiers", equipmentId, equipmentName);
                             
-                            // RESTORED: Create generic subcategories for clarity
+                            // Create generic subcategories for clarity
                             this.createUniqueWbsNode("Circuit Breakers", tiersId, equipmentName);
                             this.createUniqueWbsNode("Current Transformers", tiersId, equipmentName);
                             this.createUniqueWbsNode("Voltage Transformers", tiersId, equipmentName);
@@ -1232,7 +1257,31 @@
                             const parentId = this.keySections[sectionKey];
                             this.createWbsNode(equipmentName, parentId);
                         }
-                    } else if (['+UC', '+CA', '+HN'].includes(eqType)) {
+                    } else if (eqType === '+CA') {
+                        // NEW: Power Factor Correction under Ancillary Systems
+                        for (const sectionKey of ['fat_ancillary', 'sat_ancillary']) {
+                            const parentId = this.keySections[sectionKey];
+                            this.createWbsNode(equipmentName, parentId);
+                        }
+                    } else if (eqType === '+GB') {
+                        // NEW: Battery Systems under DC Systems > Battery Systems
+                        for (const sectionKey of ['fat_dc_battery', 'sat_dc_battery']) {
+                            const parentId = this.keySections[sectionKey];
+                            this.createWbsNode(equipmentName, parentId);
+                        }
+                    } else if (['+HN', 'PC', 'FM', 'ASDU', 'LOOP'].includes(eqType)) {
+                        // NEW: Building Services equipment
+                        for (const sectionKey of ['fat_building', 'sat_building']) {
+                            const parentId = this.keySections[sectionKey];
+                            this.createWbsNode(equipmentName, parentId);
+                        }
+                    } else if (eqType === '-UC') {
+                        // NEW: DC Rectifiers directly under DC Systems
+                        for (const sectionKey of ['fat_dc_systems', 'sat_dc_systems']) {
+                            const parentId = this.keySections[sectionKey];
+                            this.createWbsNode(equipmentName, parentId);
+                        }
+                    } else if (['+UC'].includes(eqType)) {
                         for (const sectionKey of ['fat_ancillary', 'sat_ancillary']) {
                             const parentId = this.keySections[sectionKey];
                             this.createWbsNode(equipmentName, parentId);
@@ -1243,6 +1292,7 @@
                             this.createWbsNode(equipmentName, parentId);
                         }
                     } else {
+                        // Default fallback to ancillary systems
                         for (const sectionKey of ['fat_ancillary', 'sat_ancillary']) {
                             const parentId = this.keySections[sectionKey];
                             this.createWbsNode(equipmentName, parentId);
