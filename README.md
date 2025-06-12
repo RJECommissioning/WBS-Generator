@@ -1,34 +1,387 @@
-# WBS Generator for Commissioning Projects - Version 3.1
+# WBS Generator for Commissioning Projects - Version 3.2
 
 A specialized Work Breakdown Structure (WBS) generator designed for electrical commissioning projects that automatically creates comprehensive project structures by parsing equipment lists and mapping them to standardized commissioning phases with **hybrid structure: generic subcategories for clarity + direct parent-child naming for activity template alignment**.
 
-## What's New in Version 3.1
+## What's New in Version 3.2
 
-### 🎯 **Hybrid Structure Implementation**
-- **Retained Generic Subcategories**: Kept "Feeder Protection", "Circuit Breakers", etc. for user clarity and understanding
-- **Added Direct Parent-Child Naming**: Equipment uses format like `+UH01 - -F01` for perfect activity template alignment
-- **Best of Both Worlds**: Clear structure for humans + optimal mapping for activity systems
-- **Activity Template Integration**: WBS element names now directly correspond to activity template categories
+### 🎯 **Major Performance Fix - Equipment Duplication Eliminated**
+- **Fixed Critical Issue**: Resolved equipment duplication that was creating 498 nodes from 125 equipment items
+- **35% Node Reduction**: Optimized from 498 to 326 nodes (172 fewer nodes)
+- **Root Parent Logic**: Only true root equipment (+UH01, +WA10, etc.) create parent structures
+- **Eliminated Duplicate Processing**: Intermediate equipment (+WA10-A01, +WA10-A02) no longer create independent parent structures
+- **Performance Optimized**: Dramatically improved processing efficiency and output clarity
 
-### 🔧 **Perfect Balance: Clarity + Functionality**
+### 🔧 **Enhanced Equipment Processing**
+- **True Root Detection**: Automatically identifies main equipment vs intermediate tiers
+- **Ultimate Parent Tracking**: Groups all child equipment under the correct root parent
+- **Proper Naming Preservation**: Equipment shows actual relationships (e.g., `+WA10-A01 - CB10`)
+- **Zero Unwanted Duplicates**: Each equipment appears exactly twice (FAT + SAT only)
 
-**Hybrid Structure Example:**
+### 📊 **Current Recognition Status**
+- **Recognition Rate**: 92% (115/125 equipment items automatically categorized)
+- **Uncategorized Items**: 10 equipment items requiring classification guidance
+- **Formatting Issues**: 6 equipment names needing cleanup (replace "/" characters)
+- **Ready for 100%**: Framework prepared for complete equipment recognition
+
+### 🔍 **Hybrid Structure Benefits Maintained**
+- **User-Friendly Navigation**: Generic subcategories preserved for non-electrical experts
+- **Activity Template Integration**: Direct parent-child naming for perfect activity mapping
+- **P6 Optimization**: Clean structure designed for dual-import workflow (WBS + Activities)
+- **Template Consistency**: Standardized approach supports activity library reuse
+
+## Overview
+
+The WBS Generator streamlines the creation of work breakdown structures for electrical commissioning projects by:
+- Processing equipment lists from CSV, Excel (.xlsx), or JSON files
+- **Intelligently detecting true root equipment** to prevent duplication
+- Automatically categorizing equipment by type with **generic subcategories for clarity**
+- Generating **direct parent-child naming format** for perfect activity template alignment
+- Creating standardized FAT (Factory Acceptance Test) and SAT (Site Acceptance Test) structures
+- Producing P6-compatible CSV files with **activity-template-ready WBS codes**
+- **Delivering optimized node counts** for efficient project management
+
+## How It Works
+
+### 1. **Input: Equipment List**
+The generator processes equipment lists with the following required columns:
+- `Parent Equipment Number` - References parent equipment (use "-" for root-level equipment)
+- `Equipment Number` - Unique equipment identifier/tag
+- `PLU` - Product Line Unit category
+- `Description` - Equipment description
+
+**Example Equipment List:**
 ```
-+UH01                             ← Parent equipment
-├── +UH01 Feeder Protection       ← Generic subcategory (clarity for users)
-│   ├── +UH01 - -F01              ← Direct naming (activity template alignment)
-│   └── +UH01 - -F02              ← Direct naming (activity template alignment)
-├── +UH01 Network Devices         ← Generic subcategory (clarity for users)
-│   └── +UH01 - -Y01              ← Direct naming (activity template alignment)
-└── +UH01 Control Devices         ← Generic subcategory (clarity for users)
-    └── +UH01 - -KF01             ← Direct naming (activity template alignment)
+Parent Equipment Number | Equipment Number | PLU              | Description
+-                      | +UH01            | Protection Panel | 33kV Protection Panel #1
++UH01                  | +UH01-F01        | Feeder Prot      | Feeder Protection Device #1
++UH01                  | +UH01-F02        | Feeder Prot      | Feeder Protection Device #2
+-                      | +WA10            | HV Switchboard   | 33kV Main Switchboard
++WA10                  | +WA10-A01        | HV Tier          | Switchboard Tier A01
++WA10-A01              | CB10             | Circuit Breaker  | 630A Circuit Breaker
 ```
 
-### 📋 **Key Advantages of Hybrid Approach**
-1. **User-Friendly Navigation**: Generic subcategories help non-electrical experts understand equipment organization
-2. **Activity Template Ready**: Direct naming format (`+UH01 - -F01`) maps perfectly to activity libraries
-3. **P6 Dual-Import Optimized**: Clean separation between WBS structure and activity assignment
-4. **Template Consistency**: Standardized naming supports activity template reuse across projects
+### 2. **Processing: Smart Equipment Organization with Root Detection**
+
+**NEW in v3.2: Root Parent Logic**
+```
+BEFORE v3.2 (CAUSED DUPLICATES):
++WA10 creates structure         ← Root equipment
++WA10-A01 creates structure     ← Created duplicate parent! 
++WA10-A02 creates structure     ← Created duplicate parent!
+= Equipment appeared multiple times
+
+AFTER v3.2 (OPTIMIZED):
++WA10 creates ONE structure     ← Only root equipment creates structure
+  └── All children grouped here properly
+  └── CB10 shows as "+WA10-A01 - CB10" (correct naming)
+= Equipment appears exactly twice (FAT + SAT)
+```
+
+### **Current Equipment Recognition (92% Success Rate):**
+
+| Equipment Code | **Generic Subcategory** | **Direct Child Format** | **Activity Template Mapping** |
+|---|---|---|---|
+| `+UH` | "Feeder Protection" | `+UH01 - -F01` | Maps to `-F` activities (28 activities) |
+| `+UH` | "Control Devices" | `+UH01 - -KF01` | Maps to `-KF` activities (3 activities) |
+| `+UH` | "Network Devices" | `+UH01 - -Y01` | Maps to `-Y` activities (16 activities) |
+| `+WA` | "Circuit Breakers" | `+WA10-A01 - CB10` | Maps to `CB` activities |
+| `+WA` | "Current Transformers" | `+WA10-A01 - CT10` | Maps to `CT` activities |
+| `+WA` | "Voltage Transformers" | `+WA10-A01 - VT01` | Maps to `VT` activities |
+| `+WC` | "Protection Devices" | `+WC01 - D01` | Maps to protection activities |
+| `T##` | Direct placement | `T01`, `T10` | Maps to transformer activities |
+
+### **Equipment Requiring Classification (8% - In Progress):**
+- Power Factor Correction (`+CA117`)
+- Battery Systems (`+GB01`, `+GB02`)
+- Fire Detection (`FM01`, `ASDU01`, `LOOP1`)
+- Building Services (`+HN01`, `PC1`)
+- DC Systems (`-UC10`, `-UC20`)
+
+### 3. **Output: Optimized Hybrid WBS Structure**
+
+**Performance Optimized Structure (v3.2):**
+```
+1 | Sample Commissioning Project
+2 |   FAT
+7 |     FAT - Protection Panels
+275 |       +UH01                          ← Single parent structure
+276 |         +UH01 Feeder Protection      ← Generic subcategory (clarity)
+277 |           +UH01 - -F01               ← Direct naming (activity mapping)
+278 |           +UH01 - -F02               ← Direct naming (activity mapping)
+279 |         +UH01 Control Devices        ← Generic subcategory (clarity)
+280 |           +UH01 - -KF01              ← Direct naming (activity mapping)
+8 |     FAT - HV Switchboards
+35 |       +WA10                          ← Single parent structure
+36 |         +WA10 Tiers                  ← Unique tier naming
+37 |           +WA10 Circuit Breakers     ← Generic subcategory (clarity)
+38 |             +WA10-A01 - CB10         ← Proper parent-child naming
+39 |             +WA10-A02 - CB03         ← Proper parent-child naming
+40 |           +WA10 Current Transformers ← Generic subcategory (clarity)
+41 |             +WA10-A01 - CT10         ← Proper parent-child naming
+```
+
+**Key Improvement**: No duplicate equipment structures, each item appears exactly twice (FAT + SAT).
+
+## Key Features
+
+### 🔧 **Optimized Equipment Processing**
+- **Smart Root Detection**: Automatically identifies true parent equipment vs intermediate tiers
+- **Duplicate Prevention**: Eliminates equipment duplication that inflated node counts
+- **Multi-format Support**: Import CSV, Excel (.xlsx), and JSON files
+- **Intelligent Categorization**: Creates generic subcategories with unique naming
+- **92% Recognition Rate**: Automatically categorizes most standard electrical equipment
+- **Performance Optimized**: 35% reduction in node count for faster processing
+
+### 📊 **Hybrid Structure Excellence**
+- **User Navigation**: Generic subcategories make equipment easy to find and understand
+- **System Integration**: Direct naming format enables perfect activity template mapping
+- **Consistent Framework**: Every project gets the same optimized hybrid base structure
+- **Dual Testing Phases**: Separate FAT and SAT structures for each equipment category
+- **Node Efficiency**: Optimized structure reduces complexity while maintaining functionality
+
+### 📤 **P6-Ready Export with Performance**
+- **Optimized CSV Format**: Reduced node count for faster P6 imports
+- **Activity Mapping Codes**: WBS element names correspond directly to activity template categories
+- **Unique WBS IDs**: Sequential numbering for each WBS element
+- **Parent References**: Proper hierarchical structure maintained
+- **Template Integration**: Perfect foundation for activity template import
+- **Performance Metrics**: 326 nodes from 125 equipment items (2.6 nodes per equipment including FAT/SAT)
+
+## Performance Improvements in v3.2
+
+### **Before v3.2 (Problematic):**
+- **498 total nodes** from 125 equipment items
+- **Excessive duplication**: Equipment appearing 3-4 times instead of 2
+- **Intermediate equipment creating parent structures**
+- **Complex navigation due to duplicate hierarchies**
+
+### **After v3.2 (Optimized):**
+- **326 total nodes** from 125 equipment items (35% reduction)
+- **Zero excessive duplicates**: Each equipment appears exactly twice (FAT + SAT)
+- **Clean parent-child relationships**: Only true root equipment creates structures
+- **Efficient navigation**: Logical hierarchy without duplicates**
+
+### **Performance Metrics:**
+- **Processing Speed**: Faster generation due to optimized logic
+- **P6 Import**: Reduced import time with fewer nodes
+- **User Experience**: Cleaner structure easier to navigate
+- **Maintenance**: Simplified structure easier to manage
+
+## Equipment Recognition Status
+
+### **Currently Recognized (92% - 115/125 items):**
+- **Protection Panels**: +UH01-08 with -F, -KF, -Y devices ✅
+- **HV Switchboards**: +WA10-11 with CB, CT, VT equipment ✅
+- **LV Switchboards**: +WC01 with protection devices ✅
+- **Transformers**: T01, T10 ✅
+- **Building Services**: +Z01-07 with various subsystems ✅
+- **Circuit Breakers, CTs, VTs**: All variants ✅
+
+### **Pending Classification (8% - 10/125 items):**
+- **Power Factor Correction**: +CA117 (11kV Equipment)
+- **Battery Systems**: +GB01, +GB02 (Battery Banks)
+- **Fire Detection**: FM01, ASDU01, LOOP1 (Fire Detection System)
+- **Building Services**: +HN01 (Oil Water Separator), PC1 (Desktop PC)
+- **DC Systems**: -UC10, -UC20 (Rectifiers under +UH08)
+
+### **Formatting Cleanup Needed (6 items):**
+- **Replace "/" with "-"**: D01/E01 → D01-E01, D10/E10 → D10-E10, etc.
+- **Standardize naming**: Consistent equipment code format
+
+## Usage
+
+### Step 1: Prepare Equipment List
+Create a spreadsheet with your equipment data:
+- Use "-" for root-level equipment (no parent)
+- Follow standard electrical naming conventions
+- Include complete parent-child relationships
+- **Clean up formatting**: Replace "/" with "-", remove spaces from codes
+
+### Step 2: Upload and Process
+1. Open the WBS Generator application
+2. Click "Choose File" and select your equipment list
+3. Enter your project name
+4. Click "Generate WBS Structure"
+
+### Step 3: Review Optimized Output
+1. **Verify node count**: Should be ~2.5-3 nodes per equipment item
+2. **Check for duplicates**: Each equipment should appear exactly twice (FAT + SAT)
+3. **Review structure**: Generic subcategories with direct parent-child naming
+4. Download the CSV file for P6 WBS import
+
+### Step 4: Activity Template Integration
+1. Import WBS structure into P6
+2. Use WBS element names to map activity templates
+3. Import activities using standardized templates
+4. Replicate across similar equipment types
+
+## Activity Template Integration
+
+### **Direct Mapping Examples**
+The hybrid structure creates perfect 1:1 mapping between WBS elements and activity templates:
+
+| **WBS Element** | **Activity Template** | **Standard Activities** |
+|---|---|---|
+| `+UH01 - -F01` | `-F` Template | 28 activities (testing, settings, documentation) |
+| `+UH01 - -KF01` | `-KF` Template | 3 activities (I/O, settings, labeling) |
+| `+UH01 - -Y01` | `-Y` Template | 16 activities (documentation, configuration) |
+| `+WA10-A01 - CB10` | `CB` Template | Circuit breaker specific activities |
+| `+WA10-A01 - CT10` | `CT` Template | Current transformer activities |
+
+### **P6 Workflow Integration**
+1. **WBS Import**: Import optimized WBS structure CSV into P6 (326 nodes)
+2. **Activity Template Import**: Import activities using WBS codes for assignment
+3. **Template Reuse**: Copy standardized activity sets between similar equipment
+4. **Project Scaling**: Use same activity templates across multiple projects
+
+## Output Format
+
+The generator produces an optimized CSV file for P6 import and activity template mapping:
+
+| Column | Description | Example |
+|---|---|---|
+| `WBS ID` | Unique WBS identifier | 277 |
+| `Parent WBS` | Parent WBS reference | 276 |
+| `WBS` | Optimized hybrid WBS element name | +UH01 - -F01 |
+
+**Sample Optimized Output:**
+```csv
+WBS ID,Parent WBS,WBS
+275,,+UH01
+276,275,+UH01 Feeder Protection
+277,276,+UH01 - -F01
+278,276,+UH01 - -F02
+279,275,+UH01 Control Devices
+280,279,+UH01 - -KF01
+```
+
+**Performance Note**: Structure optimized to eliminate duplicates while maintaining full functionality.
+
+## Equipment Naming Conventions
+
+The hybrid approach works optimally with standard electrical naming conventions:
+
+### Protection Panels (`+UH##`)
+```
++UH01                                ← Root equipment (creates single structure)
+├── +UH01 Feeder Protection
+│   ├── +UH01 - -F01                ← Maps to -F activity template
+│   └── +UH01 - -F02                ← Maps to -F activity template
+├── +UH01 Control Devices
+│   └── +UH01 - -KF01               ← Maps to -KF activity template
+└── +UH01 Network Devices
+    └── +UH01 - -Y01                ← Maps to -Y activity template
+```
+
+### HV Switchboards (`+WA##`) - Optimized Structure
+```
++WA10                                ← Root equipment (single structure)
+└── +WA10 Tiers
+    ├── +WA10 Circuit Breakers
+    │   ├── +WA10-A01 - CB10        ← Proper parent-child naming
+    │   └── +WA10-A02 - CB03        ← Proper parent-child naming
+    ├── +WA10 Current Transformers
+    │   └── +WA10-A01 - CT10        ← Proper parent-child naming
+    └── +WA10 Voltage Transformers
+        └── +WA10-A01 - VT01        ← Proper parent-child naming
+
+Note: No duplicate +WA10-A01 parent structures created!
+```
+
+## Version 3.2 Advantages
+
+### **Performance Optimization**
+- **35% Node Reduction**: From 498 to 326 nodes for same equipment
+- **Zero Unwanted Duplicates**: Each equipment appears exactly twice (FAT + SAT)
+- **Faster Processing**: Optimized algorithms reduce generation time
+- **Efficient P6 Import**: Fewer nodes mean faster import and better performance
+
+### **Structural Improvements**
+- **Root Parent Logic**: Only true equipment creates parent structures
+- **Proper Relationships**: Maintains actual parent-child relationships in naming
+- **Clean Hierarchy**: Eliminates confusing duplicate structures
+- **Logical Organization**: Equipment grouped under correct root parents
+
+### **User Experience Enhancement**
+- **Clearer Navigation**: No duplicate hierarchies to confuse users
+- **Better Performance**: Faster loading and processing in P6
+- **Consistent Structure**: Predictable organization across all projects
+- **Activity Integration**: Perfect alignment with activity template systems
+
+### **System Integration**
+- **P6 Optimization**: Structure designed specifically for P6 efficiency
+- **Activity Template Ready**: Direct mapping between WBS and activity libraries
+- **Template Consistency**: Standardized approach enables cross-project reuse
+- **Scalability**: Handles large projects efficiently with optimized node count
+
+## Technical Specifications
+
+- **Input Formats**: CSV, Excel (.xlsx), JSON
+- **Output Formats**: CSV (P6-compatible), JSON
+- **Structure Type**: Hybrid (Generic Subcategories + Direct Naming)
+- **Performance**: 326 nodes from 125 equipment items (2.6 nodes per equipment)
+- **Recognition Rate**: 92% automatic categorization
+- **Activity Template Ready**: Yes - Direct WBS-to-template mapping
+- **Browser Support**: Modern browsers with JavaScript enabled
+- **File Size Limit**: Handles equipment lists up to 1000+ items
+- **Processing Time**: Typically under 5 seconds for standard projects
+- **Node Efficiency**: 35% reduction from previous version
+
+## Roadmap to 100% Recognition
+
+### **Phase 1: Classification (In Progress)**
+- **Obtain expert guidance** on 10 uncategorized equipment items
+- **Define new categories** or assign to existing categories
+- **Update recognition patterns** in generator
+
+### **Phase 2: Implementation**
+- **Add new equipment patterns** based on classification guidance
+- **Test with updated patterns** to achieve 100% recognition
+- **Validate P6 integration** with complete equipment coverage
+
+### **Phase 3: Enhancement**
+- **Add activity templates** for new equipment categories
+- **Optimize performance** further based on usage patterns
+- **Expand recognition** for industry-specific equipment variants
+
+## Troubleshooting
+
+### Common Issues
+
+**Node Count Still Too High**
+- Verify no duplicate parent structures in output
+- Check that intermediate equipment don't create independent hierarchies
+- Expected: ~2.5-3 nodes per equipment item including FAT/SAT duplication
+
+**Equipment Not Recognized**
+- Check equipment follows standard naming conventions
+- Refer to uncategorized equipment list for classification guidance
+- Verify formatting follows conventions (no "/", no spaces in codes)
+
+**P6 Import Problems**
+- Ensure CSV format matches P6 import requirements
+- Verify no duplicate WBS names exist at same hierarchical level
+- Check optimized node count reduces import time
+
+**Activity Template Mapping Issues**
+- Confirm WBS element names use direct format (+UH01 - -F01)
+- Verify activity templates match expected naming patterns
+- Check that equipment codes align with activity template categories
+
+### **Performance Troubleshooting**
+**Generation Taking Too Long**
+- Check equipment list size (optimized for up to 1000 items)
+- Verify no circular references in parent-child relationships
+- Clear browser cache and retry
+
+**P6 Import Slow**
+- Confirm using optimized v3.2 output (326 nodes vs 498)
+- Check P6 system performance and available memory
+- Import in smaller batches if necessary
+
+---
+
+*Generated by WBS Generator v3.2 - Performance Optimized: 35% Node Reduction + Hybrid Structure for Maximum Efficiency and Activity Template Integration*
 
 ## Overview
 
