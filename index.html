@@ -856,19 +856,19 @@
 
             // NEW v3.5: Methods to add children to EXISTING parent structures (no duplication)
             addChildrenToProtectionPanels(parentCode, equipmentByType, allEquipmentGroups) {
-                console.log(`🔧 Adding children to EXISTING Protection Panel: ${parentCode}`);
+                console.log('Adding children to EXISTING Protection Panel: ' + parentCode);
                 
                 // Find the existing parent structures
-                const existingParents = this.wbsStructure.filter(node => node.WBS === parentCode);
+                const existingParents = this.wbsStructure.filter(node => node['WBS'] === parentCode);
                 
                 for (const parentNode of existingParents) {
                     const parentWbsId = parentNode['WBS ID'];
                     
                     // Find the existing subcategories
                     const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
-                    const feederProtNode = existingChildren.find(node => node.WBS.includes('Feeder Protection'));
-                    const networkDevNode = existingChildren.find(node => node.WBS.includes('Network Devices'));
-                    const controlDevNode = existingChildren.find(node => node.WBS.includes('Control Devices'));
+                    const feederProtNode = existingChildren.find(node => node['WBS'].includes('Feeder Protection'));
+                    const networkDevNode = existingChildren.find(node => node['WBS'].includes('Network Devices'));
+                    const controlDevNode = existingChildren.find(node => node['WBS'].includes('Control Devices'));
                     
                     if (feederProtNode || networkDevNode || controlDevNode) {
                         for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
@@ -886,13 +886,13 @@
                             
                             for (const eqItem of equipmentList) {
                                 if (eqItem.equipment.includes('-KF11')) {
-                                    console.log(`🚫 BLOCKING KF11: ${eqItem.equipment}`);
+                                    console.log('BLOCKING KF11: ' + eqItem.equipment);
                                     continue;
                                 }
                                 
                                 const immediateParent = eqItem.immediateParent || parentCode;
                                 const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
-                                const formattedChildName = `${immediateParent} - ${childEquipmentCode}`;
+                                const formattedChildName = immediateParent + ' - ' + childEquipmentCode;
                                 
                                 const equipmentId = this.createWbsNode(formattedChildName, targetParent);
                                 
@@ -906,17 +906,17 @@
             }
 
             addChildrenToLvSwitchboards(parentCode, equipmentByType, allEquipmentGroups) {
-                console.log(`🔧 Adding children to EXISTING LV Switchboard: ${parentCode}`);
+                console.log('Adding children to EXISTING LV Switchboard: ' + parentCode);
                 
-                const existingParents = this.wbsStructure.filter(node => node.WBS === parentCode);
+                const existingParents = this.wbsStructure.filter(node => node['WBS'] === parentCode);
                 
                 for (const parentNode of existingParents) {
                     const parentWbsId = parentNode['WBS ID'];
                     const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
                     
-                    const protNode = existingChildren.find(node => node.WBS.includes('Protection Devices'));
-                    const meterNode = existingChildren.find(node => node.WBS.includes('Metering Devices'));
-                    const ctNode = existingChildren.find(node => node.WBS.includes('Current Transformers'));
+                    const protNode = existingChildren.find(node => node['WBS'].includes('Protection Devices'));
+                    const meterNode = existingChildren.find(node => node['WBS'].includes('Metering Devices'));
+                    const ctNode = existingChildren.find(node => node['WBS'].includes('Current Transformers'));
                     
                     if (protNode || meterNode || ctNode) {
                         for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
@@ -929,7 +929,7 @@
                             } else if (eqType === 'CT' && ctNode) {
                                 targetParent = ctNode['WBS ID'];
                             } else if (meterNode) {
-                                targetParent = meterNode['WBS ID']; // Default
+                                targetParent = meterNode['WBS ID'];
                             } else {
                                 continue;
                             }
@@ -937,7 +937,7 @@
                             for (const eqItem of equipmentList) {
                                 const immediateParent = eqItem.immediateParent || parentCode;
                                 const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
-                                const formattedChildName = `${immediateParent} - ${childEquipmentCode}`;
+                                const formattedChildName = immediateParent + ' - ' + childEquipmentCode;
                                 
                                 const equipmentId = this.createWbsNode(formattedChildName, targetParent);
                                 this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
@@ -948,21 +948,21 @@
             }
 
             addChildrenToHvSwitchboards(parentCode, equipmentByType, allEquipmentGroups) {
-                console.log(`🔧 Adding children to EXISTING HV Switchboard: ${parentCode}`);
+                console.log('Adding children to EXISTING HV Switchboard: ' + parentCode);
                 
-                const existingParents = this.wbsStructure.filter(node => node.WBS === parentCode);
+                const existingParents = this.wbsStructure.filter(node => node['WBS'] === parentCode);
                 
                 for (const parentNode of existingParents) {
                     const parentWbsId = parentNode['WBS ID'];
                     const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
                     
                     // Find the Tiers node
-                    const tiersNode = existingChildren.find(node => node.WBS.includes('Tiers'));
+                    const tiersNode = existingChildren.find(node => node['WBS'].includes('Tiers'));
                     if (tiersNode) {
                         const tiersChildren = this.wbsStructure.filter(node => node['Parent WBS'] === tiersNode['WBS ID']);
-                        const cbNode = tiersChildren.find(node => node.WBS.includes('Circuit Breakers'));
-                        const ctNode = tiersChildren.find(node => node.WBS.includes('Current Transformers'));
-                        const vtNode = tiersChildren.find(node => node.WBS.includes('Voltage Transformers'));
+                        const cbNode = tiersChildren.find(node => node['WBS'].includes('Circuit Breakers'));
+                        const ctNode = tiersChildren.find(node => node['WBS'].includes('Current Transformers'));
+                        const vtNode = tiersChildren.find(node => node['WBS'].includes('Voltage Transformers'));
                         
                         for (const [eqType, equipmentList] of Object.entries(equipmentByType)) {
                             let targetParent;
@@ -980,7 +980,7 @@
                             for (const eqItem of equipmentList) {
                                 const immediateParent = eqItem.immediateParent || parentCode;
                                 const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
-                                const formattedChildName = `${immediateParent} - ${childEquipmentCode}`;
+                                const formattedChildName = immediateParent + ' - ' + childEquipmentCode;
                                 
                                 const equipmentId = this.createWbsNode(formattedChildName, targetParent);
                                 this.addNestedChildren(eqItem.equipment, equipmentId, allEquipmentGroups);
