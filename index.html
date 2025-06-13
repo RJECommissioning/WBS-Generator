@@ -890,7 +890,7 @@
                     const parentId = this.keySections[sections[i]];
                     const equipmentId = this.createWbsNode(equipmentName, parentId);
                     
-                    this.createUniqueWbsNode("Feeder Protection", equipmentId, equipmentName);
+                    this.createUniqueWbsNode("IED", equipmentId, equipmentName);
                     this.createUniqueWbsNode("Network Devices", equipmentId, equipmentName);
                     this.createUniqueWbsNode("Control Devices", equipmentId, equipmentName);
                 }
@@ -980,17 +980,17 @@
                     const parentWbsId = parentNode['WBS ID'];
                     
                     const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
-                    const feederProtNode = existingChildren.find(node => node['WBS'].includes('Feeder Protection'));
+                    const iedNode = existingChildren.find(node => node['WBS'].includes('IED'));
                     const networkDevNode = existingChildren.find(node => node['WBS'].includes('Network Devices'));
                     const controlDevNode = existingChildren.find(node => node['WBS'].includes('Control Devices'));
                     
-                    if (feederProtNode || networkDevNode || controlDevNode) {
+                    if (iedNode || networkDevNode || controlDevNode) {
                         for (const eqType in equipmentByType) {
                             const equipmentList = equipmentByType[eqType];
                             let targetParent;
                             
-                            if (eqType === '-F' && feederProtNode) {
-                                targetParent = feederProtNode['WBS ID'];
+                            if (eqType === '-F' && iedNode) {
+                                targetParent = iedNode['WBS ID'];
                             } else if (eqType === '-Y' && networkDevNode) {
                                 targetParent = networkDevNode['WBS ID'];
                             } else if (eqType === '-KF' && controlDevNode) {
