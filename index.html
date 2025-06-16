@@ -647,17 +647,17 @@
 
             extractDescription(item) {
                 return (
-                    item.plu_name || 
-                    item['PLU Name'] ||
-                    item['plu name'] ||
-                    item.plu || 
-                    item.PLU || 
                     item.description || 
-                    item.Description ||
+                    item.Description ||     // This should be found first - the detailed description
                     item.desc ||
                     item.Desc ||
                     item.name ||
                     item.Name ||
+                    item.plu_name || 
+                    item['PLU Name'] ||
+                    item['plu name'] ||
+                    item.plu ||             // PLU moved to end - this is just the category
+                    item.PLU ||
                     ''
                 ).toString().trim();
             }
