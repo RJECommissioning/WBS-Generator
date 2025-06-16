@@ -1249,6 +1249,12 @@
                 return;
             }
 
+            // Check if libraries are loaded
+            if (typeof Papa === 'undefined' || typeof XLSX === 'undefined') {
+                showError('Required libraries not loaded. Please refresh the page and try again.');
+                return;
+            }
+
             document.getElementById('loading').style.display = 'block';
             document.getElementById('resultsSection').style.display = 'none';
             document.getElementById('processBtn').disabled = true;
@@ -1257,14 +1263,20 @@
                 let equipmentData = [];
                 const projectName = document.getElementById('projectName').value || 'Sample Commissioning Project';
 
+                console.log('Processing file:', currentFile.name);
+                console.log('File type check:', currentFile.name.split('.').pop());
+
                 if (currentFile.name.endsWith('.csv')) {
+                    console.log('Parsing as CSV');
                     equipmentData = await parseCSV(currentFile);
                 } else if (currentFile.name.endsWith('.xlsx')) {
+                    console.log('Parsing as Excel');
                     equipmentData = await parseExcel(currentFile);
                 } else if (currentFile.name.endsWith('.json')) {
+                    console.log('Parsing as JSON');
                     equipmentData = await parseJSON(currentFile);
                 } else {
-                    throw new Error('Unsupported file format');
+                    throw new Error('Unsupported file format: ' + currentFile.name);
                 }
 
                 if (!equipmentData || equipmentData.length === 0) {
@@ -1292,6 +1304,13 @@
 
         function parseCSV(file) {
             return new Promise(function(resolve, reject) {
+                // Check if Papa Parse is loaded
+                if (typeof Papa === 'undefined') {
+                    console.error('Papa Parse library not loaded');
+                    reject(new Error('Papa Parse library not loaded. Please refresh the page.'));
+                    return;
+                }
+                
                 Papa.parse(file, {
                     header: true,
                     dynamicTyping: true,
@@ -1314,6 +1333,13 @@
 
         function parseExcel(file) {
             return new Promise(function(resolve, reject) {
+                // Check if XLSX is loaded
+                if (typeof XLSX === 'undefined') {
+                    console.error('XLSX library not loaded');
+                    reject(new Error('XLSX library not loaded. Please refresh the page.'));
+                    return;
+                }
+                
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
@@ -1530,9 +1556,23 @@
                 fileInfo: !!fileInfo
             });
             
+            // Check if libraries are loaded
+            console.log('Libraries loaded:', {
+                Papa: typeof Papa !== 'undefined',
+                XLSX: typeof XLSX !== 'undefined'
+            });
+            
             if (fileInput) {
                 console.log('File input accept attribute:', fileInput.accept);
                 console.log('File input multiple attribute:', fileInput.multiple);
+            }
+            
+            // Warn if libraries not loaded
+            if (typeof Papa === 'undefined') {
+                console.error('Papa Parse library failed to load');
+            }
+            if (typeof XLSX === 'undefined') {
+                console.error('XLSX library failed to load');
             }
         });
         
