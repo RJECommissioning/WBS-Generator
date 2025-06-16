@@ -450,6 +450,7 @@
                 console.log('=== PARSING EQUIPMENT LIST - v3.5 OPTIMIZED ===');
                 const equipmentGroups = {};
                 const orphanEquipment = [];
+                const unrecognisedEquipment = [];
                 let skippedRelationships = 0;
                 
                 if (equipmentData.length > 0) {
@@ -500,13 +501,25 @@
                     // Handle orphan equipment (true roots)
                     if (!parent || parent === '-') {
                         const equipmentType = this.identifyEquipmentType(equipment);
-                        orphanEquipment.push({
-                            equipment: equipment,
-                            type: equipmentType,
-                            plu_name: pluName,
-                            parent: null
-                        });
-                        console.log('ROOT EQUIPMENT: ' + equipment + ' (' + (equipmentType || 'Unknown') + ')');
+                        
+                        if (equipmentType) {
+                            orphanEquipment.push({
+                                equipment: equipment,
+                                type: equipmentType,
+                                plu_name: pluName,
+                                parent: null
+                            });
+                            console.log('ROOT EQUIPMENT: ' + equipment + ' (' + (equipmentType || 'Unknown') + ')');
+                        } else {
+                            // Unrecognised equipment
+                            unrecognisedEquipment.push({
+                                equipment: equipment,
+                                type: null,
+                                plu_name: pluName,
+                                parent: null
+                            });
+                            console.log('UNRECOGNISED EQUIPMENT: ' + equipment + ' (type: unknown)');
+                        }
                     } else {
                         // AGGRESSIVE FILTERING - Skip problematic relationships
                         if (parent.includes('-KF11') && equipment.includes('-KF11')) {
@@ -583,10 +596,11 @@
                 console.log('v3.5 OPTIMIZED RESULTS:');
                 console.log('   Equipment groups (true roots only): ' + Object.keys(equipmentGroups).length);
                 console.log('   Orphan equipment (true roots): ' + orphanEquipment.length);
+                console.log('   Unrecognised equipment: ' + unrecognisedEquipment.length);
                 console.log('   Skipped non-root relationships: ' + skippedRelationships);
                 console.log('   Expected duplication: Each equipment 2x only (FAT + SAT)');
                 
-                return { equipmentGroups, orphanEquipment };
+                return { equipmentGroups, orphanEquipment, unrecognisedEquipment };
             }
 
             extractParent(item) {
@@ -748,6 +762,7 @@
                 const energisationId = this.createWbsNode("Energisation", projectId);
                 const prerequisitesId = this.createWbsNode("Pre-Requisites", projectId);
                 const milestonesId = this.createWbsNode("Milestones", projectId);
+                const unrecognisedId = this.createWbsNode("Unrecognised Equipment", projectId);
                 
                 // FAT structure with unique naming
                 const fatProtectionPanelsId = this.createWbsNode("FAT - Protection Panels", fatId);
@@ -759,7 +774,6 @@
                 const fatAncillaryId = this.createWbsNode("FAT - Ancillary Systems", fatId);
                 const fatDcSystemsId = this.createWbsNode("FAT - DC Systems", fatId);
                 const fatTransformersId = this.createWbsNode("FAT - Transformers", fatId);
-                const fatProtectionId = this.createWbsNode("FAT - Protection Systems", fatId);
                 
                 // SAT structure with unique naming
                 const satProtectionPanelsId = this.createWbsNode("SAT - Protection Panels", satId);
@@ -771,7 +785,6 @@
                 const satAncillaryId = this.createWbsNode("SAT - Ancillary Systems", satId);
                 const satDcSystemsId = this.createWbsNode("SAT - DC Systems", satId);
                 const satTransformersId = this.createWbsNode("SAT - Transformers", satId);
-                const satProtectionId = this.createWbsNode("SAT - Protection Systems", satId);
                 
                 // v3.4: DC Systems subcategories
                 const fatDcBatteryId = this.createWbsNode("Battery Systems", fatDcSystemsId);
@@ -813,21 +826,25 @@
                     'sat_dc_battery': satDcBatteryId,
                     'fat_transformers': fatTransformersId,
                     'sat_transformers': satTransformersId,
-                    'fat_protection': fatProtectionId,
-                    'sat_protection': satProtectionId
+                    'unrecognised': unrecognisedId
                 };
                 
                 return projectId;
             }
 
-            addEquipmentToStructure(equipmentGroups, orphanEquipment) {
+            addEquipmentToStructure(equipmentGroups, orphanEquipment, unrecognisedEquipment) {
                 console.log('=== ADDING EQUIPMENT TO OPTIMIZED STRUCTURE (v3.5) ===');
                 console.log('Equipment groups to process:', Object.keys(equipmentGroups));
                 console.log('Orphan equipment to process:', orphanEquipment.length);
+                console.log('Unrecognised equipment to process:', unrecognisedEquipment.length);
                 
                 // v3.5 CRITICAL FIX: Only process orphan equipment (true roots)
                 console.log('Processing orphan equipment (true roots) - FIRST PASS...');
                 this.addOrphanEquipment(orphanEquipment);
+                
+                // Add unrecognised equipment to special section
+                console.log('Processing unrecognised equipment...');
+                this.addUnrecognisedEquipment(unrecognisedEquipment);
                 
                 // Then add children to existing structures (minimal processing)
                 console.log('Adding children to existing parent structures...');
@@ -855,52 +872,71 @@
                 for (const eqItem of orphanEquipment) {
                     const eqType = eqItem.type;
                     const equipmentName = eqItem.equipment;
+                    const description = eqItem.plu_name;
                     
                     console.log('Processing orphan: ' + equipmentName + ' with type: ' + eqType);
                     
                     if (eqType === '+UH') {
-                        this.addToProtectionPanels(equipmentName);
+                        this.addToProtectionPanels(equipmentName, description);
                     } else if (eqType === '+WC') {
-                        this.addToLvSwitchboards(equipmentName);
+                        this.addToLvSwitchboards(equipmentName, description);
                     } else if (eqType === '+WA') {
-                        this.addToHvSwitchboards(equipmentName);
+                        this.addToHvSwitchboards(equipmentName, description);
                     } else if (eqType === 'T') {
-                        this.addToTransformers(equipmentName);
+                        this.addToTransformers(equipmentName, description);
                     } else if (['D', 'E', 'CB'].includes(eqType)) {
-                        this.addToProtectionSystems(equipmentName);
+                        // These are now handled by unrecognised equipment or their parents
+                        console.log('Skipping orphaned protection device (should have parent): ' + equipmentName);
                     } else if (eqType === '+CA') {
-                        this.addToAncillarySystems(equipmentName);
+                        this.addToAncillarySystems(equipmentName, description);
                     } else if (eqType === '+GB') {
-                        this.addToDcBatterySystems(equipmentName);
+                        this.addToDcBatterySystems(equipmentName, description);
                     } else if (['+HN', 'PC', 'FM', 'ASDU', 'LOOP'].includes(eqType)) {
-                        this.addToBuildingServices(equipmentName);
+                        this.addToBuildingServices(equipmentName, description);
                     } else if (eqType === '-UC' || eqType === '+UC') {
-                        this.addToDcSystems(equipmentName);
+                        this.addToDcSystems(equipmentName, description);
                     } else {
                         console.log('Using fallback for ' + equipmentName + ' (type: ' + eqType + ')');
-                        this.addToAncillarySystems(equipmentName);
+                        this.addToAncillarySystems(equipmentName, description);
                     }
                 }
             }
 
+            addUnrecognisedEquipment(unrecognisedEquipment) {
+                console.log('=== PROCESSING UNRECOGNISED EQUIPMENT ===');
+                
+                for (const eqItem of unrecognisedEquipment) {
+                    const equipmentName = eqItem.equipment;
+                    const description = eqItem.plu_name;
+                    
+                    console.log('Adding unrecognised equipment: ' + equipmentName);
+                    
+                    const parentId = this.keySections['unrecognised'];
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
+                }
+            }
+
             // Helper methods for adding equipment to specific sections
-            addToProtectionPanels(equipmentName) {
+            addToProtectionPanels(equipmentName, description) {
                 const sections = ['fat_protection_panels', 'sat_protection_panels'];
                 for (let i = 0; i < sections.length; i++) {
                     const parentId = this.keySections[sections[i]];
-                    const equipmentId = this.createWbsNode(equipmentName, parentId);
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    const equipmentId = this.createWbsNode(fullName, parentId);
                     
-                    this.createUniqueWbsNode("IED", equipmentId, equipmentName);
+                    this.createUniqueWbsNode("Protection Devices", equipmentId, equipmentName);
                     this.createUniqueWbsNode("Network Devices", equipmentId, equipmentName);
                     this.createUniqueWbsNode("Control Devices", equipmentId, equipmentName);
                 }
             }
 
-            addToLvSwitchboards(equipmentName) {
+            addToLvSwitchboards(equipmentName, description) {
                 const sections = ['fat_lv_switchboards', 'sat_lv_switchboards'];
                 for (let i = 0; i < sections.length; i++) {
                     const parentId = this.keySections[sections[i]];
-                    const equipmentId = this.createWbsNode(equipmentName, parentId);
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    const equipmentId = this.createWbsNode(fullName, parentId);
                     
                     this.createUniqueWbsNode("Protection Devices", equipmentId, equipmentName);
                     this.createUniqueWbsNode("Metering Devices", equipmentId, equipmentName);
@@ -908,11 +944,12 @@
                 }
             }
 
-            addToHvSwitchboards(equipmentName) {
+            addToHvSwitchboards(equipmentName, description) {
                 const sections = ['fat_hv_switchboards', 'sat_hv_switchboards'];
                 for (let i = 0; i < sections.length; i++) {
                     const parentId = this.keySections[sections[i]];
-                    const equipmentId = this.createWbsNode(equipmentName, parentId);
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    const equipmentId = this.createWbsNode(fullName, parentId);
                     
                     const tiersId = this.createUniqueWbsNode("Tiers", equipmentId, equipmentName);
                     
@@ -922,75 +959,72 @@
                 }
             }
 
-            addToTransformers(equipmentName) {
+            addToTransformers(equipmentName, description) {
                 const sections = ['fat_transformers', 'sat_transformers'];
                 for (let i = 0; i < sections.length; i++) {
                     const parentId = this.keySections[sections[i]];
-                    this.createWbsNode(equipmentName, parentId);
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
                 }
             }
 
-            addToProtectionSystems(equipmentName) {
-                const sections = ['fat_protection', 'sat_protection'];
-                for (let i = 0; i < sections.length; i++) {
-                    const parentId = this.keySections[sections[i]];
-                    this.createWbsNode(equipmentName, parentId);
-                }
-            }
-
-            addToAncillarySystems(equipmentName) {
+            addToAncillarySystems(equipmentName, description) {
                 const sections = ['fat_ancillary', 'sat_ancillary'];
                 for (let i = 0; i < sections.length; i++) {
                     const parentId = this.keySections[sections[i]];
-                    this.createWbsNode(equipmentName, parentId);
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
                 }
             }
 
-            addToDcBatterySystems(equipmentName) {
+            addToDcBatterySystems(equipmentName, description) {
                 const sections = ['fat_dc_battery', 'sat_dc_battery'];
                 for (let i = 0; i < sections.length; i++) {
                     const parentId = this.keySections[sections[i]];
-                    this.createWbsNode(equipmentName, parentId);
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
                 }
             }
 
-            addToBuildingServices(equipmentName) {
+            addToBuildingServices(equipmentName, description) {
                 const sections = ['fat_building', 'sat_building'];
                 for (let i = 0; i < sections.length; i++) {
                     const parentId = this.keySections[sections[i]];
-                    this.createWbsNode(equipmentName, parentId);
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
                 }
             }
 
-            addToDcSystems(equipmentName) {
+            addToDcSystems(equipmentName, description) {
                 const sections = ['fat_dc_systems', 'sat_dc_systems'];
                 for (let i = 0; i < sections.length; i++) {
                     const parentId = this.keySections[sections[i]];
-                    this.createWbsNode(equipmentName, parentId);
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
                 }
             }
 
             addChildrenToProtectionPanels(parentCode, equipmentByType, allEquipmentGroups) {
                 console.log('Adding children to EXISTING Protection Panel: ' + parentCode);
                 
-                const existingParents = this.wbsStructure.filter(node => node['WBS'] === parentCode);
+                const existingParents = this.wbsStructure.filter(node => node['WBS'].includes(parentCode));
                 
                 for (let i = 0; i < existingParents.length; i++) {
                     const parentNode = existingParents[i];
                     const parentWbsId = parentNode['WBS ID'];
                     
                     const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
-                    const iedNode = existingChildren.find(node => node['WBS'].includes('IED'));
+                    const protectionDevicesNode = existingChildren.find(node => node['WBS'].includes('Protection Devices'));
                     const networkDevNode = existingChildren.find(node => node['WBS'].includes('Network Devices'));
                     const controlDevNode = existingChildren.find(node => node['WBS'].includes('Control Devices'));
                     
-                    if (iedNode || networkDevNode || controlDevNode) {
+                    if (protectionDevicesNode || networkDevNode || controlDevNode) {
                         for (const eqType in equipmentByType) {
                             const equipmentList = equipmentByType[eqType];
                             let targetParent;
                             
-                            if (eqType === '-F' && iedNode) {
-                                targetParent = iedNode['WBS ID'];
+                            if (eqType === '-F' && protectionDevicesNode) {
+                                targetParent = protectionDevicesNode['WBS ID'];
                             } else if (eqType === '-Y' && networkDevNode) {
                                 targetParent = networkDevNode['WBS ID'];
                             } else if (eqType === '-KF' && controlDevNode) {
@@ -1008,7 +1042,8 @@
                                 
                                 const immediateParent = eqItem.immediateParent || parentCode;
                                 const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
-                                const formattedChildName = immediateParent + ' - ' + childEquipmentCode;
+                                const description = eqItem.plu_name;
+                                const formattedChildName = immediateParent + ' | ' + childEquipmentCode + (description ? ' ' + description : '');
                                 
                                 this.createWbsNode(formattedChildName, targetParent);
                             }
@@ -1020,7 +1055,7 @@
             addChildrenToLvSwitchboards(parentCode, equipmentByType, allEquipmentGroups) {
                 console.log('Adding children to EXISTING LV Switchboard: ' + parentCode);
                 
-                const existingParents = this.wbsStructure.filter(node => node['WBS'] === parentCode);
+                const existingParents = this.wbsStructure.filter(node => node['WBS'].includes(parentCode));
                 
                 for (let i = 0; i < existingParents.length; i++) {
                     const parentNode = existingParents[i];
@@ -1052,7 +1087,8 @@
                                 const eqItem = equipmentList[j];
                                 const immediateParent = eqItem.immediateParent || parentCode;
                                 const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
-                                const formattedChildName = immediateParent + ' - ' + childEquipmentCode;
+                                const description = eqItem.plu_name;
+                                const formattedChildName = immediateParent + ' | ' + childEquipmentCode + (description ? ' ' + description : '');
                                 
                                 this.createWbsNode(formattedChildName, targetParent);
                             }
@@ -1064,7 +1100,7 @@
             addChildrenToHvSwitchboards(parentCode, equipmentByType, allEquipmentGroups) {
                 console.log('Adding children to EXISTING HV Switchboard: ' + parentCode);
                 
-                const existingParents = this.wbsStructure.filter(node => node['WBS'] === parentCode);
+                const existingParents = this.wbsStructure.filter(node => node['WBS'].includes(parentCode));
                 
                 for (let i = 0; i < existingParents.length; i++) {
                     const parentNode = existingParents[i];
@@ -1096,7 +1132,8 @@
                                 const eqItem = equipmentList[j];
                                 const immediateParent = eqItem.immediateParent || parentCode;
                                 const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
-                                const formattedChildName = immediateParent + ' - ' + childEquipmentCode;
+                                const description = eqItem.plu_name;
+                                const formattedChildName = immediateParent + ' | ' + childEquipmentCode + (description ? ' ' + description : '');
                                 
                                 this.createWbsNode(formattedChildName, targetParent);
                             }
@@ -1117,11 +1154,12 @@
                 const result = this.parseEquipmentList(equipmentData);
                 const equipmentGroups = result.equipmentGroups;
                 const orphanEquipment = result.orphanEquipment;
+                const unrecognisedEquipment = result.unrecognisedEquipment;
                 
                 this.buildStandardStructure(projectName);
                 console.log('Standard structure built:', this.wbsStructure.length, 'nodes');
                 
-                this.addEquipmentToStructure(equipmentGroups, orphanEquipment);
+                this.addEquipmentToStructure(equipmentGroups, orphanEquipment, unrecognisedEquipment);
                 
                 console.log('=== WBS GENERATOR v3.5 COMPLETE ===');
                 console.log('Final WBS structure: ' + this.wbsStructure.length + ' nodes');
