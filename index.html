@@ -306,7 +306,7 @@
         <div class="header">
             <h1>WBS Generator</h1>
             <p>Upload your equipment list and generate a comprehensive Work Breakdown Structure</p>
-            <div class="version-badge">v3.5 - Optimized Performance + Fixed Ordering</div>
+            <div class="version-badge">v3.5 - Fixed Category Ordering + Optimized Performance</div>
         </div>
 
         <div class="main-content">
@@ -387,31 +387,26 @@
         let wbsData = null;
         let generator = null;
 
-        // WBS Generator Class - Version 3.5 OPTIMIZED
+        // WBS Generator Class - Version 3.5 with ONLY Category Ordering Fixed
         class WBSGenerator {
             constructor() {
                 this.wbsCounter = 1;
                 this.wbsStructure = [];
                 
-                // Fixed category ordering
-                this.CATEGORY_ORDER = [
-                    'Preparations and set-up',
-                    'Protection Panels',
-                    'HV Switchboards',
-                    'LV Switchboards',
-                    'Transformers',
-                    'DC Systems',
-                    'Ancillary Systems',
-                    'Building Services',
-                    'Interface Testing'
-                ];
-                
-                // Streamlined equipment recognition (removed redundant patterns)
+                // Enhanced equipment recognition (v3.4 + v3.5)
                 this.equipmentTypes = {
                     '+UH': 'Protection Panels',
                     '+WC': 'LV Switchboards', 
                     '+WA': 'HV Switchboards',
+                    '-F': 'Feeder Protection',
+                    '-KF': 'Control Devices',
+                    '-Y': 'Network Devices',
+                    'CB': 'Circuit Breakers',
+                    'CT': 'Current Transformers',
+                    'VT': 'Voltage Transformers',
+                    '+Z01-X01': 'Building Services',
                     'T': 'Transformers',
+                    '+UC': 'Control Systems',
                     '+CA': 'Ancillary Systems',
                     '+HN': 'Building Services',
                     'PC': 'Building Services',
@@ -419,42 +414,91 @@
                     'ASDU': 'Building Services',
                     'LOOP': 'Building Services',
                     '+GB': 'DC Systems',
+                    'D': 'Protection Devices',
+                    'E': 'Protection Devices',
                     '-UC': 'DC Systems'
+                };
+                
+                this.equipmentPatterns = {
+                    '\\+UH\\d+': 'Protection Panels',
+                    '\\+WC\\d+': 'LV Switchboards',
+                    '\\+WA\\d+': 'HV Switchboards',
+                    '.*-F\\d+': 'Feeder Protection',
+                    '.*-KF\\d+': 'Control Devices',
+                    '.*-Y\\d+': 'Network Devices',
+                    '.*CB\\d+': 'Circuit Breakers',
+                    '.*CT\\d+': 'Current Transformers',
+                    '.*VT\\d+': 'Voltage Transformers',
+                    '\\+Z\\d+-X\\d+': 'Building Services',
+                    '^T\\d+': 'Transformers',
+                    '\\+UC\\d+': 'Control Systems',
+                    '\\+CA\\d+': 'Ancillary Systems',
+                    '\\+HN\\d+': 'Building Services',
+                    '^PC\\d+': 'Building Services',
+                    '^FM\\d+': 'Building Services',
+                    '^ASDU\\d+': 'Building Services',
+                    '^LOOP\\d+': 'Building Services',
+                    '\\+GB\\d+': 'DC Systems',
+                    '^D\\d+': 'Protection Devices',
+                    '^E\\d+': 'Protection Devices',
+                    'D\\d+\\s*/\\s*E\\d+': 'Protection Devices',
+                    '.*-UC\\d+': 'DC Systems'
                 };
             }
 
-            // Streamlined equipment parsing - removed excessive logging
             parseEquipmentList(equipmentData) {
+                console.log('=== PARSING EQUIPMENT LIST - v3.5 OPTIMIZED ===');
                 const equipmentGroups = {};
                 const orphanEquipment = [];
                 const unrecognisedEquipment = [];
+                let skippedRelationships = 0;
                 
-                // Get root equipment only
+                if (equipmentData.length > 0) {
+                    console.log('Available columns in your data:', Object.keys(equipmentData[0]));
+                    console.log('First equipment item (raw):', equipmentData[0]);
+                }
+                
+                // STEP 1: Identify TRUE ROOT EQUIPMENT ONLY (v3.5 FIX)
                 const trueRootEquipment = new Set();
                 const allEquipmentCodes = new Set();
                 
-                equipmentData.forEach(item => {
-                    const equipment = this.extractField(item, ['equipment', 'Equipment', 'equipment number', 'Equipment Number', 'equipment_number', 'Equipment_Number']);
-                    if (equipment) allEquipmentCodes.add(equipment);
-                });
-                
-                equipmentData.forEach(item => {
-                    const parent = this.extractField(item, ['parent', 'Parent', 'parent equipment number', 'Parent Equipment Number', 'parent_equipment_number', 'Parent_Equipment_Number']);
-                    const equipment = this.extractField(item, ['equipment', 'Equipment', 'equipment number', 'Equipment Number', 'equipment_number', 'Equipment_Number']);
-                    
-                    if (equipment && (!parent || parent === '-')) {
-                        trueRootEquipment.add(equipment);
+                // Collect all equipment codes first
+                for (const item of equipmentData) {
+                    const equipment = this.extractEquipment(item);
+                    if (equipment) {
+                        allEquipmentCodes.add(equipment);
                     }
-                });
+                }
                 
-                // Process equipment relationships
-                equipmentData.forEach(item => {
-                    const parent = this.extractField(item, ['parent', 'Parent', 'parent equipment number', 'Parent Equipment Number', 'parent_equipment_number', 'Parent_Equipment_Number']);
-                    const equipment = this.extractField(item, ['equipment', 'Equipment', 'equipment number', 'Equipment Number', 'equipment_number', 'Equipment_Number']);
-                    const description = this.extractField(item, ['description', 'Description', 'desc', 'Desc', 'name', 'Name', 'plu_name', 'PLU Name', 'plu', 'PLU']);
+                // NEW v3.5: Only equipment with parent = "-" are true roots
+                for (const item of equipmentData) {
+                    const parent = this.extractParent(item);
+                    const equipment = this.extractEquipment(item);
                     
-                    if (!equipment) return;
+                    if (!equipment) continue;
                     
+                    // CRITICAL v3.5 FIX: Only parent = "-" creates root structures
+                    if (!parent || parent === '-') {
+                        trueRootEquipment.add(equipment);
+                        console.log('TRUE ROOT EQUIPMENT: ' + equipment + ' (parent: "' + (parent || 'null') + '")');
+                    }
+                }
+                
+                console.log('v3.5 ROOT DETECTION: Found ' + trueRootEquipment.size + ' true root equipment');
+                console.log('True root equipment:', Array.from(trueRootEquipment));
+                
+                // STEP 2: Process equipment relationships - ONLY create structures for TRUE ROOTS
+                for (const item of equipmentData) {
+                    const parent = this.extractParent(item);
+                    const equipment = this.extractEquipment(item);
+                    const pluName = this.extractDescription(item);
+                    
+                    if (!equipment) {
+                        console.warn('Skipping item with missing equipment:', item);
+                        continue;
+                    }
+                    
+                    // Handle orphan equipment (true roots)
                     if (!parent || parent === '-') {
                         const equipmentType = this.identifyEquipmentType(equipment);
                         
@@ -462,32 +506,59 @@
                             orphanEquipment.push({
                                 equipment: equipment,
                                 type: equipmentType,
-                                plu_name: description,
+                                plu_name: pluName,
                                 parent: null
                             });
+                            console.log('ROOT EQUIPMENT: ' + equipment + ' (' + (equipmentType || 'Unknown') + ')');
                         } else {
+                            // Unrecognised equipment
                             unrecognisedEquipment.push({
                                 equipment: equipment,
                                 type: null,
-                                plu_name: description,
+                                plu_name: pluName,
                                 parent: null
                             });
+                            console.log('UNRECOGNISED EQUIPMENT: ' + equipment + ' (type: unknown)');
                         }
                     } else {
-                        // Find ultimate parent
-                        let ultimateParent = parent;
-                        let searchCount = 0;
+                        // AGGRESSIVE FILTERING - Skip problematic relationships
+                        if (parent.includes('-KF11') && equipment.includes('-KF11')) {
+                            if (!equipment.startsWith(parent + '-')) {
+                                console.log('SKIPPING KF11 SIBLING: ' + parent + ' -> ' + equipment);
+                                skippedRelationships++;
+                                continue;
+                            }
+                        }
                         
-                        while (searchCount < 5) { // Reduced from 10 to 5
+                        // Skip self-references
+                        if (parent === equipment) {
+                            console.log('SKIPPING SELF-REFERENCE: ' + parent + ' -> ' + equipment);
+                            skippedRelationships++;
+                            continue;
+                        }
+                        
+                        // Skip circular patterns
+                        if (equipment.includes(parent) && equipment !== parent && !equipment.startsWith(parent + '-')) {
+                            console.log('SKIPPING CIRCULAR PATTERN: ' + parent + ' -> ' + equipment);
+                            skippedRelationships++;
+                            continue;
+                        }
+                        
+                        // NEW v3.5: Find ultimate root parent - but ONLY process if it's a TRUE ROOT
+                        let ultimateParent = parent;
+                        let searchDepth = 0;
+                        const maxSearchDepth = 10;
+                        
+                        while (searchDepth < maxSearchDepth) {
                             const parentItem = equipmentData.find(item => 
-                                this.extractField(item, ['equipment', 'Equipment', 'equipment number', 'Equipment Number']) === ultimateParent
+                                this.extractEquipment(item) === ultimateParent
                             );
                             
                             if (parentItem) {
-                                const grandParent = this.extractField(parentItem, ['parent', 'Parent', 'parent equipment number', 'Parent Equipment Number']);
+                                const grandParent = this.extractParent(parentItem);
                                 if (grandParent && grandParent !== '-' && allEquipmentCodes.has(grandParent)) {
                                     ultimateParent = grandParent;
-                                    searchCount++;
+                                    searchDepth++;
                                 } else {
                                     break;
                                 }
@@ -496,12 +567,13 @@
                             }
                         }
                         
+                        // CRITICAL v3.5 FIX: Only create groups for TRUE ROOT PARENTS
                         if (trueRootEquipment.has(ultimateParent)) {
                             if (!equipmentGroups[ultimateParent]) {
                                 equipmentGroups[ultimateParent] = {};
                             }
                             
-                            const equipmentType = this.getChildEquipmentType(parent, equipment);
+                            const equipmentType = this.determineChildEquipmentType(parent, equipment);
                             
                             if (!equipmentGroups[ultimateParent][equipmentType]) {
                                 equipmentGroups[ultimateParent][equipmentType] = [];
@@ -509,30 +581,91 @@
                             
                             equipmentGroups[ultimateParent][equipmentType].push({
                                 equipment: equipment,
-                                plu_name: description,
+                                plu_name: pluName,
                                 immediateParent: parent
                             });
+                            
+                            console.log('GROUPED UNDER TRUE ROOT ' + ultimateParent + ': ' + equipment + ' (type: ' + equipmentType + ', immediate parent: ' + parent + ')');
+                        } else {
+                            console.log('v3.5 SKIPPED NON-ROOT PARENT: ' + ultimateParent + ' -> ' + equipment + ' (' + parent + ')');
+                            skippedRelationships++;
                         }
                     }
-                });
+                }
+                
+                console.log('v3.5 OPTIMIZED RESULTS:');
+                console.log('   Equipment groups (true roots only): ' + Object.keys(equipmentGroups).length);
+                console.log('   Orphan equipment (true roots): ' + orphanEquipment.length);
+                console.log('   Unrecognised equipment: ' + unrecognisedEquipment.length);
+                console.log('   Skipped non-root relationships: ' + skippedRelationships);
+                console.log('   Expected duplication: Each equipment 2x only (FAT + SAT)');
                 
                 return { equipmentGroups, orphanEquipment, unrecognisedEquipment };
             }
 
-            // Simplified field extraction
-            extractField(item, fieldNames) {
-                for (const field of fieldNames) {
-                    if (item[field]) {
-                        return item[field].toString().trim();
-                    }
-                }
-                return '';
+            extractParent(item) {
+                return (
+                    item.parent || 
+                    item.Parent || 
+                    item['parent equipment number'] ||
+                    item['Parent Equipment Number'] ||
+                    item['parent_equipment_number'] ||
+                    item['Parent_Equipment_Number'] ||
+                    item['parent equipment'] ||
+                    item['Parent Equipment'] ||
+                    item['parent_equipment'] ||
+                    item['Parent_Equipment'] ||
+                    item['parent number'] ||
+                    item['Parent Number'] ||
+                    item['parent_number'] ||
+                    item['Parent_Number'] ||
+                    ''
+                ).toString().trim();
             }
 
-            // Simplified child equipment type determination
-            getChildEquipmentType(parent, equipment) {
+            extractEquipment(item) {
+                return (
+                    item.equipment || 
+                    item.Equipment ||
+                    item['equipment number'] || 
+                    item['Equipment Number'] ||
+                    item['equipment_number'] || 
+                    item['Equipment_Number'] ||
+                    item['equipment code'] ||
+                    item['Equipment Code'] ||
+                    item['equipment_code'] ||
+                    item['Equipment_Code'] ||
+                    item.tag ||
+                    item.Tag ||
+                    item.number ||
+                    item.Number ||
+                    item.code ||
+                    item.Code ||
+                    ''
+                ).toString().trim();
+            }
+
+            extractDescription(item) {
+                return (
+                    item.description || 
+                    item.Description ||     // This should be found first - the detailed description
+                    item.desc ||
+                    item.Desc ||
+                    item.name ||
+                    item.Name ||
+                    item.plu_name || 
+                    item['PLU Name'] ||
+                    item['plu name'] ||
+                    item.plu ||             // PLU moved to end - this is just the category
+                    item.PLU ||
+                    ''
+                ).toString().trim();
+            }
+
+            determineChildEquipmentType(parent, equipment) {
                 if (equipment.startsWith(parent)) {
                     const suffix = equipment.substring(parent.length).replace(/^-/, '');
+                    
                     if (suffix.match(/^F\d+/)) return '-F';
                     if (suffix.match(/^KF\d+/)) return '-KF';
                     if (suffix.match(/^Y\d+/)) return '-Y';
@@ -540,43 +673,87 @@
                     if (suffix.includes('CT')) return 'CT';
                     if (suffix.includes('VT')) return 'VT';
                 }
+                
                 return this.identifyEquipmentType(equipment);
             }
 
-            // Streamlined equipment type identification
             identifyEquipmentType(equipmentCode) {
                 if (!equipmentCode) return null;
                 
                 equipmentCode = equipmentCode.toUpperCase().trim();
                 
+                // Check exact matches first
                 for (const eqType in this.equipmentTypes) {
                     if (equipmentCode.startsWith(eqType)) {
                         return eqType;
                     }
                 }
                 
+                // Check regex patterns
+                for (const pattern in this.equipmentPatterns) {
+                    if (equipmentCode.match(new RegExp(pattern, 'i'))) {
+                        const category = this.equipmentPatterns[pattern];
+                        for (const eqType in this.equipmentTypes) {
+                            if (this.equipmentTypes[eqType] === category) {
+                                return eqType;
+                            }
+                        }
+                    }
+                }
+                
                 return null;
             }
 
-            // Simplified WBS node creation
-            createWbsNode(name, parentId, namePrefix = '') {
-                const fullName = namePrefix ? namePrefix + ' ' + name : name;
+            createWbsNode(name, parentId) {
+                const node = {
+                    'WBS ID': this.wbsCounter,
+                    'Parent WBS': parentId,
+                    'WBS': name
+                };
+                
+                this.wbsStructure.push(node);
+                const currentId = this.wbsCounter;
+                this.wbsCounter++;
+                return currentId;
+            }
+
+            createUniqueWbsNode(baseName, parentId, parentEquipment) {
+                let uniqueName = baseName;
+                
+                if (parentEquipment) {
+                    uniqueName = parentEquipment + ' ' + baseName;
+                }
                 
                 const node = {
                     'WBS ID': this.wbsCounter,
                     'Parent WBS': parentId,
-                    'WBS': fullName
+                    'WBS': uniqueName
                 };
                 
                 this.wbsStructure.push(node);
-                return this.wbsCounter++;
+                const currentId = this.wbsCounter;
+                this.wbsCounter++;
+                return currentId;
             }
 
-            // Optimized structure building
+            extractChildEquipmentCode(fullEquipmentCode, parentCode) {
+                if (fullEquipmentCode.startsWith(parentCode)) {
+                    let childCode = fullEquipmentCode.substring(parentCode.length);
+                    childCode = childCode.replace(/^[-_]+/, '');
+                    if (childCode.match(/^[FKY]\d+/)) {
+                        childCode = '-' + childCode;
+                    }
+                    return childCode;
+                }
+                
+                return fullEquipmentCode;
+            }
+
             buildStandardStructure(projectName) {
                 this.wbsCounter = 1;
                 this.wbsStructure = [];
                 
+                // Root project
                 const projectId = this.createWbsNode(projectName || "Project Name", null);
                 
                 // Main phases
@@ -587,24 +764,37 @@
                 const milestonesId = this.createWbsNode("Milestones", projectId);
                 const unrecognisedId = this.createWbsNode("Unrecognised Equipment", projectId);
                 
-                // Create ordered sections
-                const fatSectionIds = {};
-                const satSectionIds = {};
+                // FIXED: Create sections in consistent order with "Preparations and set-up" FIRST
+                const fatPrepId = this.createWbsNode("FAT - Preparations and set-up", fatId);
+                const fatProtectionPanelsId = this.createWbsNode("FAT - Protection Panels", fatId);
+                const fatHvSwitchboardsId = this.createWbsNode("FAT - HV Switchboards", fatId);
+                const fatLvSwitchboardsId = this.createWbsNode("FAT - LV Switchboards", fatId);
+                const fatTransformersId = this.createWbsNode("FAT - Transformers", fatId);
+                const fatDcSystemsId = this.createWbsNode("FAT - DC Systems", fatId);
+                const fatAncillaryId = this.createWbsNode("FAT - Ancillary Systems", fatId);
+                const fatBuildingId = this.createWbsNode("FAT - Building Services", fatId);
+                const fatInterfaceId = this.createWbsNode("FAT - Interface Testing", fatId);
                 
-                this.CATEGORY_ORDER.forEach(category => {
-                    fatSectionIds[category] = this.createWbsNode("FAT - " + category, fatId);
-                    satSectionIds[category] = this.createWbsNode("SAT - " + category, satId);
-                });
+                // SAT structure with identical ordering
+                const satPrepId = this.createWbsNode("SAT - Preparations and set-up", satId);
+                const satProtectionPanelsId = this.createWbsNode("SAT - Protection Panels", satId);
+                const satHvSwitchboardsId = this.createWbsNode("SAT - HV Switchboards", satId);
+                const satLvSwitchboardsId = this.createWbsNode("SAT - LV Switchboards", satId);
+                const satTransformersId = this.createWbsNode("SAT - Transformers", satId);
+                const satDcSystemsId = this.createWbsNode("SAT - DC Systems", satId);
+                const satAncillaryId = this.createWbsNode("SAT - Ancillary Systems", satId);
+                const satBuildingId = this.createWbsNode("SAT - Building Services", satId);
+                const satInterfaceId = this.createWbsNode("SAT - Interface Testing", satId);
                 
-                // DC Systems subcategories
-                const fatDcBatteryId = this.createWbsNode("Battery Systems", fatSectionIds['DC Systems']);
-                const satDcBatteryId = this.createWbsNode("Battery Systems", satSectionIds['DC Systems']);
+                // v3.4: DC Systems subcategories
+                const fatDcBatteryId = this.createWbsNode("Battery Systems", fatDcSystemsId);
+                const satDcBatteryId = this.createWbsNode("Battery Systems", satDcSystemsId);
                 
                 // Interface Testing phases
-                this.createWbsNode("Phase 1", fatSectionIds['Interface Testing']);
-                this.createWbsNode("Phase 2", fatSectionIds['Interface Testing']);
-                this.createWbsNode("Phase 1", satSectionIds['Interface Testing']);
-                this.createWbsNode("Phase 2", satSectionIds['Interface Testing']);
+                this.createWbsNode("Phase 1", fatInterfaceId);
+                this.createWbsNode("Phase 2", fatInterfaceId);
+                this.createWbsNode("Phase 1", satInterfaceId);
+                this.createWbsNode("Phase 2", satInterfaceId);
                 
                 // Energisation structure
                 const systemId = this.createWbsNode("System", energisationId);
@@ -616,218 +806,443 @@
                 this.createWbsNode("Phase 1", prerequisitesId);
                 this.createWbsNode("Phase 2", prerequisitesId);
                 
-                // Store sections
+                // Store key sections for equipment placement
                 this.keySections = {
-                    'fat_protection_panels': fatSectionIds['Protection Panels'],
-                    'sat_protection_panels': satSectionIds['Protection Panels'],
-                    'fat_lv_switchboards': fatSectionIds['LV Switchboards'],
-                    'sat_lv_switchboards': satSectionIds['LV Switchboards'],
-                    'fat_hv_switchboards': fatSectionIds['HV Switchboards'],
-                    'sat_hv_switchboards': satSectionIds['HV Switchboards'],
-                    'fat_building': fatSectionIds['Building Services'],
-                    'sat_building': satSectionIds['Building Services'],
-                    'fat_interface': fatSectionIds['Interface Testing'],
-                    'sat_interface': satSectionIds['Interface Testing'],
-                    'fat_ancillary': fatSectionIds['Ancillary Systems'],
-                    'sat_ancillary': satSectionIds['Ancillary Systems'],
-                    'fat_dc_systems': fatSectionIds['DC Systems'],
-                    'sat_dc_systems': satSectionIds['DC Systems'],
+                    'fat_protection_panels': fatProtectionPanelsId,
+                    'sat_protection_panels': satProtectionPanelsId,
+                    'fat_lv_switchboards': fatLvSwitchboardsId,
+                    'sat_lv_switchboards': satLvSwitchboardsId,
+                    'fat_hv_switchboards': fatHvSwitchboardsId,
+                    'sat_hv_switchboards': satHvSwitchboardsId,
+                    'fat_building': fatBuildingId,
+                    'sat_building': satBuildingId,
+                    'fat_interface': fatInterfaceId,
+                    'sat_interface': satInterfaceId,
+                    'fat_ancillary': fatAncillaryId,
+                    'sat_ancillary': satAncillaryId,
+                    'fat_dc_systems': fatDcSystemsId,
+                    'sat_dc_systems': satDcSystemsId,
                     'fat_dc_battery': fatDcBatteryId,
                     'sat_dc_battery': satDcBatteryId,
-                    'fat_transformers': fatSectionIds['Transformers'],
-                    'sat_transformers': satSectionIds['Transformers'],
+                    'fat_transformers': fatTransformersId,
+                    'sat_transformers': satTransformersId,
                     'unrecognised': unrecognisedId
                 };
                 
+                console.log('✅ FIXED ORDERING: "Preparations and set-up" now appears FIRST in both FAT and SAT!');
                 return projectId;
             }
 
-            // Streamlined equipment addition
             addEquipmentToStructure(equipmentGroups, orphanEquipment, unrecognisedEquipment) {
+                console.log('=== ADDING EQUIPMENT TO OPTIMIZED STRUCTURE (v3.5) ===');
+                console.log('Equipment groups to process:', Object.keys(equipmentGroups));
+                console.log('Orphan equipment to process:', orphanEquipment.length);
+                console.log('Unrecognised equipment to process:', unrecognisedEquipment.length);
+                
+                // v3.5 CRITICAL FIX: Only process orphan equipment (true roots)
+                console.log('Processing orphan equipment (true roots) - FIRST PASS...');
                 this.addOrphanEquipment(orphanEquipment);
+                
+                // Add unrecognised equipment to special section
+                console.log('Processing unrecognised equipment...');
                 this.addUnrecognisedEquipment(unrecognisedEquipment);
                 
+                // Then add children to existing structures (minimal processing)
+                console.log('Adding children to existing parent structures...');
                 for (const parentCode in equipmentGroups) {
+                    console.log('Adding children to existing parent: ' + parentCode);
                     const equipmentByType = equipmentGroups[parentCode];
                     const parentType = this.identifyEquipmentType(parentCode);
                     
                     if (parentType === '+UH') {
-                        this.addChildrenToParent(parentCode, equipmentByType, 'protection');
+                        this.addChildrenToProtectionPanels(parentCode, equipmentByType, equipmentGroups);
                     } else if (parentType === '+WC') {
-                        this.addChildrenToParent(parentCode, equipmentByType, 'lv');
+                        this.addChildrenToLvSwitchboards(parentCode, equipmentByType, equipmentGroups);
                     } else if (parentType === '+WA') {
-                        this.addChildrenToParent(parentCode, equipmentByType, 'hv');
+                        this.addChildrenToHvSwitchboards(parentCode, equipmentByType, equipmentGroups);
+                    }
+                }
+                
+                console.log('v3.5 FINAL: Total WBS nodes after equipment: ' + this.wbsStructure.length);
+            }
+
+            addOrphanEquipment(orphanEquipment) {
+                console.log('=== v3.5 PROCESSING ORPHAN EQUIPMENT (TRUE ROOTS) ===');
+                console.log('Orphan equipment:', orphanEquipment.map(eq => eq.equipment + ' (' + (eq.type || 'Unknown') + ')'));
+                
+                for (const eqItem of orphanEquipment) {
+                    const eqType = eqItem.type;
+                    const equipmentName = eqItem.equipment;
+                    const description = eqItem.plu_name;
+                    
+                    console.log('Processing orphan: ' + equipmentName + ' with type: ' + eqType);
+                    
+                    if (eqType === '+UH') {
+                        this.addToProtectionPanels(equipmentName, description);
+                    } else if (eqType === '+WC') {
+                        this.addToLvSwitchboards(equipmentName, description);
+                    } else if (eqType === '+WA') {
+                        this.addToHvSwitchboards(equipmentName, description);
+                    } else if (eqType === 'T') {
+                        this.addToTransformers(equipmentName, description);
+                    } else if (['D', 'E', 'CB'].includes(eqType)) {
+                        // These are now handled by unrecognised equipment or their parents
+                        console.log('Skipping orphaned protection device (should have parent): ' + equipmentName);
+                    } else if (eqType === '+CA') {
+                        this.addToAncillarySystems(equipmentName, description);
+                    } else if (eqType === '+GB') {
+                        this.addToDcBatterySystems(equipmentName, description);
+                    } else if (['+HN', 'PC', 'FM', 'ASDU', 'LOOP'].includes(eqType)) {
+                        this.addToBuildingServices(equipmentName, description);
+                    } else if (eqType === '-UC' || eqType === '+UC') {
+                        this.addToDcSystems(equipmentName, description);
+                    } else {
+                        console.log('Using fallback for ' + equipmentName + ' (type: ' + eqType + ')');
+                        this.addToAncillarySystems(equipmentName, description);
                     }
                 }
             }
 
-            addOrphanEquipment(orphanEquipment) {
-                orphanEquipment.forEach(eqItem => {
-                    const { type: eqType, equipment: equipmentName, plu_name: description } = eqItem;
-                    
-                    if (eqType === '+UH') {
-                        this.addToSections(['fat_protection_panels', 'sat_protection_panels'], equipmentName, description, ['Protection Devices', 'Network Devices', 'Control Devices']);
-                    } else if (eqType === '+WC') {
-                        this.addToSections(['fat_lv_switchboards', 'sat_lv_switchboards'], equipmentName, description, ['Protection Devices', 'Metering Devices', 'Current Transformers']);
-                    } else if (eqType === '+WA') {
-                        this.addToHvSwitchboards(equipmentName, description);
-                    } else if (eqType === 'T') {
-                        this.addToSections(['fat_transformers', 'sat_transformers'], equipmentName, description);
-                    } else if (eqType === '+CA') {
-                        this.addToSections(['fat_ancillary', 'sat_ancillary'], equipmentName, description);
-                    } else if (eqType === '+GB') {
-                        this.addToSections(['fat_dc_battery', 'sat_dc_battery'], equipmentName, description);
-                    } else if (['+HN', 'PC', 'FM', 'ASDU', 'LOOP'].includes(eqType)) {
-                        this.addToSections(['fat_building', 'sat_building'], equipmentName, description);
-                    } else if (eqType === '-UC') {
-                        this.addToSections(['fat_dc_systems', 'sat_dc_systems'], equipmentName, description);
-                    } else {
-                        this.addToSections(['fat_ancillary', 'sat_ancillary'], equipmentName, description);
-                    }
-                });
-            }
-
             addUnrecognisedEquipment(unrecognisedEquipment) {
-                unrecognisedEquipment.forEach(eqItem => {
-                    const fullName = eqItem.plu_name ? eqItem.equipment + ' ' + eqItem.plu_name : eqItem.equipment;
-                    this.createWbsNode(fullName, this.keySections['unrecognised']);
-                });
+                console.log('=== PROCESSING UNRECOGNISED EQUIPMENT ===');
+                
+                for (const eqItem of unrecognisedEquipment) {
+                    const equipmentName = eqItem.equipment;
+                    const description = eqItem.plu_name;
+                    
+                    console.log('Adding unrecognised equipment: ' + equipmentName);
+                    
+                    const parentId = this.keySections['unrecognised'];
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
+                }
             }
 
-            // Unified section addition method
-            addToSections(sectionKeys, equipmentName, description, subCategories = null) {
-                sectionKeys.forEach(sectionKey => {
-                    const parentId = this.keySections[sectionKey];
+            // Helper methods for adding equipment to specific sections
+            addToProtectionPanels(equipmentName, description) {
+                const sections = ['fat_protection_panels', 'sat_protection_panels'];
+                for (let i = 0; i < sections.length; i++) {
+                    const parentId = this.keySections[sections[i]];
                     const fullName = description ? equipmentName + ' ' + description : equipmentName;
                     const equipmentId = this.createWbsNode(fullName, parentId);
                     
-                    if (subCategories) {
-                        subCategories.forEach(subCategory => {
-                            this.createWbsNode(subCategory, equipmentId, equipmentName);
-                        });
-                    }
-                });
+                    this.createUniqueWbsNode("Protection Devices", equipmentId, equipmentName);
+                    this.createUniqueWbsNode("Network Devices", equipmentId, equipmentName);
+                    this.createUniqueWbsNode("Control Devices", equipmentId, equipmentName);
+                }
+            }
+
+            addToLvSwitchboards(equipmentName, description) {
+                const sections = ['fat_lv_switchboards', 'sat_lv_switchboards'];
+                for (let i = 0; i < sections.length; i++) {
+                    const parentId = this.keySections[sections[i]];
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    const equipmentId = this.createWbsNode(fullName, parentId);
+                    
+                    this.createUniqueWbsNode("Protection Devices", equipmentId, equipmentName);
+                    this.createUniqueWbsNode("Metering Devices", equipmentId, equipmentName);
+                    this.createUniqueWbsNode("Current Transformers", equipmentId, equipmentName);
+                }
             }
 
             addToHvSwitchboards(equipmentName, description) {
-                ['fat_hv_switchboards', 'sat_hv_switchboards'].forEach(sectionKey => {
-                    const parentId = this.keySections[sectionKey];
+                const sections = ['fat_hv_switchboards', 'sat_hv_switchboards'];
+                for (let i = 0; i < sections.length; i++) {
+                    const parentId = this.keySections[sections[i]];
                     const fullName = description ? equipmentName + ' ' + description : equipmentName;
                     const equipmentId = this.createWbsNode(fullName, parentId);
                     
-                    const tiersId = this.createWbsNode('Tiers', equipmentId, equipmentName);
-                    this.createWbsNode('Circuit Breakers', tiersId, equipmentName);
-                    this.createWbsNode('Current Transformers', tiersId, equipmentName);
-                    this.createWbsNode('Voltage Transformers', tiersId, equipmentName);
-                });
+                    const tiersId = this.createUniqueWbsNode("Tiers", equipmentId, equipmentName);
+                    
+                    this.createUniqueWbsNode("Circuit Breakers", tiersId, equipmentName);
+                    this.createUniqueWbsNode("Current Transformers", tiersId, equipmentName);
+                    this.createUniqueWbsNode("Voltage Transformers", tiersId, equipmentName);
+                }
             }
 
-            // Simplified child addition (combined 3 similar methods into 1)
-            addChildrenToParent(parentCode, equipmentByType, parentTypeCategory) {
+            addToTransformers(equipmentName, description) {
+                const sections = ['fat_transformers', 'sat_transformers'];
+                for (let i = 0; i < sections.length; i++) {
+                    const parentId = this.keySections[sections[i]];
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
+                }
+            }
+
+            addToAncillarySystems(equipmentName, description) {
+                const sections = ['fat_ancillary', 'sat_ancillary'];
+                for (let i = 0; i < sections.length; i++) {
+                    const parentId = this.keySections[sections[i]];
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
+                }
+            }
+
+            addToDcBatterySystems(equipmentName, description) {
+                const sections = ['fat_dc_battery', 'sat_dc_battery'];
+                for (let i = 0; i < sections.length; i++) {
+                    const parentId = this.keySections[sections[i]];
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
+                }
+            }
+
+            addToBuildingServices(equipmentName, description) {
+                const sections = ['fat_building', 'sat_building'];
+                for (let i = 0; i < sections.length; i++) {
+                    const parentId = this.keySections[sections[i]];
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
+                }
+            }
+
+            addToDcSystems(equipmentName, description) {
+                const sections = ['fat_dc_systems', 'sat_dc_systems'];
+                for (let i = 0; i < sections.length; i++) {
+                    const parentId = this.keySections[sections[i]];
+                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
+                    this.createWbsNode(fullName, parentId);
+                }
+            }
+
+            addChildrenToProtectionPanels(parentCode, equipmentByType, allEquipmentGroups) {
+                console.log('Adding children to EXISTING Protection Panel: ' + parentCode);
+                
                 const existingParents = this.wbsStructure.filter(node => node['WBS'].includes(parentCode));
                 
-                existingParents.forEach(parentNode => {
+                for (let i = 0; i < existingParents.length; i++) {
+                    const parentNode = existingParents[i];
+                    const parentWbsId = parentNode['WBS ID'];
+                    
+                    const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
+                    const protectionDevicesNode = existingChildren.find(node => node['WBS'].includes('Protection Devices'));
+                    const networkDevNode = existingChildren.find(node => node['WBS'].includes('Network Devices'));
+                    const controlDevNode = existingChildren.find(node => node['WBS'].includes('Control Devices'));
+                    
+                    if (protectionDevicesNode || networkDevNode || controlDevNode) {
+                        for (const eqType in equipmentByType) {
+                            const equipmentList = equipmentByType[eqType];
+                            let targetParent;
+                            
+                            if (eqType === '-F' && protectionDevicesNode) {
+                                targetParent = protectionDevicesNode['WBS ID'];
+                            } else if (eqType === '-Y' && networkDevNode) {
+                                targetParent = networkDevNode['WBS ID'];
+                            } else if (eqType === '-KF' && controlDevNode) {
+                                targetParent = controlDevNode['WBS ID'];
+                            } else {
+                                continue;
+                            }
+                            
+                            for (let j = 0; j < equipmentList.length; j++) {
+                                const eqItem = equipmentList[j];
+                                if (eqItem.equipment.includes('-KF11')) {
+                                    console.log('BLOCKING KF11: ' + eqItem.equipment);
+                                    continue;
+                                }
+                                
+                                const immediateParent = eqItem.immediateParent || parentCode;
+                                const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
+                                const description = eqItem.plu_name;
+                                const formattedChildName = immediateParent + ' | ' + childEquipmentCode + (description ? ' ' + description : '');
+                                
+                                this.createWbsNode(formattedChildName, targetParent);
+                            }
+                        }
+                    }
+                }
+            }
+
+            addChildrenToLvSwitchboards(parentCode, equipmentByType, allEquipmentGroups) {
+                console.log('Adding children to EXISTING LV Switchboard: ' + parentCode);
+                
+                const existingParents = this.wbsStructure.filter(node => node['WBS'].includes(parentCode));
+                
+                for (let i = 0; i < existingParents.length; i++) {
+                    const parentNode = existingParents[i];
                     const parentWbsId = parentNode['WBS ID'];
                     const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
                     
-                    // Get target nodes based on parent type
-                    let targetNodes = {};
-                    if (parentTypeCategory === 'protection') {
-                        targetNodes['-F'] = existingChildren.find(node => node['WBS'].includes('Protection Devices'));
-                        targetNodes['-Y'] = existingChildren.find(node => node['WBS'].includes('Network Devices'));
-                        targetNodes['-KF'] = existingChildren.find(node => node['WBS'].includes('Control Devices'));
-                    } else if (parentTypeCategory === 'lv') {
-                        targetNodes['PROT'] = existingChildren.find(node => node['WBS'].includes('Protection Devices'));
-                        targetNodes['METER'] = existingChildren.find(node => node['WBS'].includes('Metering Devices'));
-                        targetNodes['CT'] = existingChildren.find(node => node['WBS'].includes('Current Transformers'));
-                    } else if (parentTypeCategory === 'hv') {
-                        const tiersNode = existingChildren.find(node => node['WBS'].includes('Tiers'));
-                        if (tiersNode) {
-                            const tiersChildren = this.wbsStructure.filter(node => node['Parent WBS'] === tiersNode['WBS ID']);
-                            targetNodes['CB'] = tiersChildren.find(node => node['WBS'].includes('Circuit Breakers'));
-                            targetNodes['CT'] = tiersChildren.find(node => node['WBS'].includes('Current Transformers'));
-                            targetNodes['VT'] = tiersChildren.find(node => node['WBS'].includes('Voltage Transformers'));
-                        }
-                    }
+                    const protNode = existingChildren.find(node => node['WBS'].includes('Protection Devices'));
+                    const meterNode = existingChildren.find(node => node['WBS'].includes('Metering Devices'));
+                    const ctNode = existingChildren.find(node => node['WBS'].includes('Current Transformers'));
                     
-                    // Add children to appropriate targets
-                    for (const eqType in equipmentByType) {
-                        const equipmentList = equipmentByType[eqType];
-                        const targetParent = targetNodes[eqType];
-                        
-                        if (targetParent || (parentTypeCategory === 'lv' && targetNodes['METER'])) {
-                            const finalTarget = targetParent || targetNodes['METER'];
+                    if (protNode || meterNode || ctNode) {
+                        for (const eqType in equipmentByType) {
+                            const equipmentList = equipmentByType[eqType];
+                            let targetParent;
                             
-                            equipmentList.forEach(eqItem => {
-                                if (eqItem.equipment.includes('-KF11')) return; // Skip problematic equipment
-                                
+                            if (['PROT', 'PROTECTION'].includes(eqType) && protNode) {
+                                targetParent = protNode['WBS ID'];
+                            } else if (['METER', 'METERING'].includes(eqType) && meterNode) {
+                                targetParent = meterNode['WBS ID'];
+                            } else if (eqType === 'CT' && ctNode) {
+                                targetParent = ctNode['WBS ID'];
+                            } else if (meterNode) {
+                                targetParent = meterNode['WBS ID'];
+                            } else {
+                                continue;
+                            }
+                            
+                            for (let j = 0; j < equipmentList.length; j++) {
+                                const eqItem = equipmentList[j];
                                 const immediateParent = eqItem.immediateParent || parentCode;
-                                const childCode = eqItem.equipment.startsWith(immediateParent) 
-                                    ? eqItem.equipment.substring(immediateParent.length).replace(/^[-_]+/, '')
-                                    : eqItem.equipment;
+                                const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
+                                const description = eqItem.plu_name;
+                                const formattedChildName = immediateParent + ' | ' + childEquipmentCode + (description ? ' ' + description : '');
                                 
-                                const formattedName = immediateParent + ' | ' + childCode + (eqItem.plu_name ? ' ' + eqItem.plu_name : '');
-                                this.createWbsNode(formattedName, finalTarget['WBS ID']);
-                            });
+                                this.createWbsNode(formattedChildName, targetParent);
+                            }
                         }
                     }
-                });
+                }
             }
 
-            // Main generation method
+            addChildrenToHvSwitchboards(parentCode, equipmentByType, allEquipmentGroups) {
+                console.log('Adding children to EXISTING HV Switchboard: ' + parentCode);
+                
+                const existingParents = this.wbsStructure.filter(node => node['WBS'].includes(parentCode));
+                
+                for (let i = 0; i < existingParents.length; i++) {
+                    const parentNode = existingParents[i];
+                    const parentWbsId = parentNode['WBS ID'];
+                    const existingChildren = this.wbsStructure.filter(node => node['Parent WBS'] === parentWbsId);
+                    
+                    const tiersNode = existingChildren.find(node => node['WBS'].includes('Tiers'));
+                    if (tiersNode) {
+                        const tiersChildren = this.wbsStructure.filter(node => node['Parent WBS'] === tiersNode['WBS ID']);
+                        const cbNode = tiersChildren.find(node => node['WBS'].includes('Circuit Breakers'));
+                        const ctNode = tiersChildren.find(node => node['WBS'].includes('Current Transformers'));
+                        const vtNode = tiersChildren.find(node => node['WBS'].includes('Voltage Transformers'));
+                        
+                        for (const eqType in equipmentByType) {
+                            const equipmentList = equipmentByType[eqType];
+                            let targetParent;
+                            
+                            if (eqType === 'CB' && cbNode) {
+                                targetParent = cbNode['WBS ID'];
+                            } else if (eqType === 'CT' && ctNode) {
+                                targetParent = ctNode['WBS ID'];
+                            } else if (eqType === 'VT' && vtNode) {
+                                targetParent = vtNode['WBS ID'];
+                            } else {
+                                continue;
+                            }
+                                
+                            for (let j = 0; j < equipmentList.length; j++) {
+                                const eqItem = equipmentList[j];
+                                const immediateParent = eqItem.immediateParent || parentCode;
+                                const childEquipmentCode = this.extractChildEquipmentCode(eqItem.equipment, immediateParent);
+                                const description = eqItem.plu_name;
+                                const formattedChildName = immediateParent + ' | ' + childEquipmentCode + (description ? ' ' + description : '');
+                                
+                                this.createWbsNode(formattedChildName, targetParent);
+                            }
+                        }
+                    }
+                }
+            }
+
             generateWbs(equipmentData, projectName) {
-                if (!equipmentData || equipmentData.length === 0) return [];
+                console.log('=== WBS GENERATOR v3.5 START (FIXED ORDERING) ===');
+                console.log('Equipment data received:', equipmentData ? equipmentData.length : 0, 'items');
+                
+                if (!equipmentData || equipmentData.length === 0) {
+                    console.warn("No equipment data provided");
+                    return [];
+                }
                 
                 const result = this.parseEquipmentList(equipmentData);
+                const equipmentGroups = result.equipmentGroups;
+                const orphanEquipment = result.orphanEquipment;
+                const unrecognisedEquipment = result.unrecognisedEquipment;
+                
                 this.buildStandardStructure(projectName);
-                this.addEquipmentToStructure(result.equipmentGroups, result.orphanEquipment, result.unrecognisedEquipment);
+                console.log('Standard structure built:', this.wbsStructure.length, 'nodes');
+                
+                this.addEquipmentToStructure(equipmentGroups, orphanEquipment, unrecognisedEquipment);
+                
+                console.log('=== WBS GENERATOR v3.5 COMPLETE (FIXED ORDERING) ===');
+                console.log('Final WBS structure: ' + this.wbsStructure.length + ' nodes');
+                console.log('Performance: ' + (this.wbsStructure.length / equipmentData.length).toFixed(1) + ' nodes per equipment item');
+                console.log('✅ Both FAT and SAT now have "Preparations and set-up" FIRST!');
                 
                 return this.wbsStructure;
             }
         }
 
-        // File handling functions
+        // File handling functions - FIXED
         function handleFileUpload() {
-            document.getElementById('fileInput').click();
+            console.log('Upload button clicked');
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput) {
+                fileInput.click();
+            }
         }
 
+        // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, setting up file input handler');
             const fileInput = document.getElementById('fileInput');
             const processBtn = document.getElementById('processBtn');
             
-            fileInput.addEventListener('change', function(event) {
-                const file = event.target.files[0];
-                if (file) {
-                    currentFile = file;
-                    displayFileInfo(file);
-                    processBtn.disabled = false;
-                } else {
-                    processBtn.disabled = true;
-                }
-            });
+            if (fileInput) {
+                fileInput.addEventListener('change', function(event) {
+                    console.log('File input change event triggered');
+                    const file = event.target.files[0];
+                    console.log('Selected file:', file);
+                    
+                    if (file) {
+                        currentFile = file;
+                        displayFileInfo(file);
+                        if (processBtn) {
+                            processBtn.disabled = false;
+                        }
+                        console.log('File successfully selected:', file.name);
+                    } else {
+                        console.log('No file selected');
+                        if (processBtn) {
+                            processBtn.disabled = true;
+                        }
+                    }
+                });
+            } else {
+                console.error('File input element not found');
+            }
         });
 
         function displayFileInfo(file) {
+            console.log('Displaying file info for:', file.name);
             const fileInfo = document.getElementById('fileInfo');
-            fileInfo.innerHTML = 
-                '<strong>File:</strong> ' + file.name + '<br>' +
-                '<strong>Size:</strong> ' + (file.size / 1024).toFixed(2) + ' KB<br>' +
-                '<strong>Type:</strong> ' + (file.type || 'Unknown');
-            fileInfo.style.display = 'block';
+            if (fileInfo) {
+                fileInfo.innerHTML = 
+                    '<strong>File:</strong> ' + file.name + '<br>' +
+                    '<strong>Size:</strong> ' + (file.size / 1024).toFixed(2) + ' KB<br>' +
+                    '<strong>Type:</strong> ' + (file.type || 'Unknown') + '<br>' +
+                    '<strong>Last Modified:</strong> ' + new Date(file.lastModified).toLocaleDateString();
+                fileInfo.style.display = 'block';
+                console.log('File info displayed successfully');
+            } else {
+                console.error('File info element not found');
+            }
         }
 
         function showError(message) {
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
-            setTimeout(() => errorDiv.style.display = 'none', 5000);
+            setTimeout(function() {
+                errorDiv.style.display = 'none';
+            }, 5000);
         }
 
         function showSuccess(message) {
             const successDiv = document.getElementById('successMessage');
             successDiv.textContent = message;
             successDiv.style.display = 'block';
-            setTimeout(() => successDiv.style.display = 'none', 3000);
+            setTimeout(function() {
+                successDiv.style.display = 'none';
+            }, 3000);
         }
 
         async function processFile() {
@@ -836,6 +1251,7 @@
                 return;
             }
 
+            // Check if libraries are loaded
             if (typeof Papa === 'undefined' || typeof XLSX === 'undefined') {
                 showError('Required libraries not loaded. Please refresh the page and try again.');
                 return;
@@ -849,11 +1265,17 @@
                 let equipmentData = [];
                 const projectName = document.getElementById('projectName').value || 'Sample Commissioning Project';
 
+                console.log('Processing file:', currentFile.name);
+                console.log('File type check:', currentFile.name.split('.').pop());
+
                 if (currentFile.name.endsWith('.csv')) {
+                    console.log('Parsing as CSV');
                     equipmentData = await parseCSV(currentFile);
                 } else if (currentFile.name.endsWith('.xlsx')) {
+                    console.log('Parsing as Excel');
                     equipmentData = await parseExcel(currentFile);
                 } else if (currentFile.name.endsWith('.json')) {
+                    console.log('Parsing as JSON');
                     equipmentData = await parseJSON(currentFile);
                 } else {
                     throw new Error('Unsupported file format: ' + currentFile.name);
@@ -863,12 +1285,18 @@
                     throw new Error('No valid equipment data found in file');
                 }
 
+                console.log('Equipment data sample:', equipmentData.slice(0, 5));
+                console.log('Total equipment items:', equipmentData.length);
+
+                // Generate WBS with v3.5 optimizations + FIXED ORDERING
                 generator = new WBSGenerator();
                 wbsData = generator.generateWbs(equipmentData, projectName);
+
                 displayResults();
-                showSuccess('✅ Optimized WBS structure generated with fixed ordering!');
+                showSuccess('✅ Optimized WBS structure generated with FIXED category ordering - "Preparations and set-up" now appears FIRST in both FAT and SAT!');
 
             } catch (error) {
+                console.error('Processing error:', error);
                 showError('Error processing file: ' + error.message);
             } finally {
                 document.getElementById('loading').style.display = 'none';
@@ -877,9 +1305,10 @@
         }
 
         function parseCSV(file) {
-            return new Promise((resolve, reject) => {
+            return new Promise(function(resolve, reject) {
+                // Simple CSV parser fallback if Papa Parse fails
                 if (typeof Papa === 'undefined') {
-                    // Fallback parser
+                    console.warn('Papa Parse not available, using fallback CSV parser');
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         try {
@@ -903,6 +1332,7 @@
                             reject(error);
                         }
                     };
+                    reader.onerror = reject;
                     reader.readAsText(file);
                     return;
                 }
@@ -911,14 +1341,24 @@
                     header: true,
                     dynamicTyping: true,
                     skipEmptyLines: true,
-                    complete: results => resolve(results.data),
-                    error: reject
+                    transformHeader: function(header) {
+                        return header.trim().toLowerCase().replace(/\s+/g, '_');
+                    },
+                    complete: function(results) {
+                        if (results.errors.length > 0) {
+                            console.warn('CSV parsing warnings:', results.errors);
+                        }
+                        resolve(results.data);
+                    },
+                    error: function(error) {
+                        reject(error);
+                    }
                 });
             });
         }
 
         function parseExcel(file) {
-            return new Promise((resolve, reject) => {
+            return new Promise(function(resolve, reject) {
                 if (typeof XLSX === 'undefined') {
                     reject(new Error('Excel files require the XLSX library. Please use CSV format instead.'));
                     return;
@@ -929,19 +1369,21 @@
                     try {
                         const data = new Uint8Array(e.target.result);
                         const workbook = XLSX.read(data, { type: 'array' });
-                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const sheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[sheetName];
                         const jsonData = XLSX.utils.sheet_to_json(worksheet);
                         resolve(jsonData);
                     } catch (error) {
                         reject(error);
                     }
                 };
+                reader.onerror = reject;
                 reader.readAsArrayBuffer(file);
             });
         }
 
         function parseJSON(file) {
-            return new Promise((resolve, reject) => {
+            return new Promise(function(resolve, reject) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
@@ -951,6 +1393,7 @@
                         reject(error);
                     }
                 };
+                reader.onerror = reject;
                 reader.readAsText(file);
             });
         }
@@ -963,41 +1406,62 @@
             const performanceText = document.getElementById('performanceText');
 
             const totalNodes = wbsData.length;
-            const leafNodes = wbsData.filter(node => 
-                !wbsData.some(other => other['Parent WBS'] === node['WBS ID'])
-            ).length;
+            const rootNodes = wbsData.filter(function(node) { 
+                return node['Parent WBS'] === null;
+            }).length;
+            const leafNodes = wbsData.filter(function(node) {
+                return !wbsData.some(function(other) { 
+                    return other['Parent WBS'] === node['WBS ID'];
+                });
+            }).length;
 
-            const equipmentItems = generator ? 
-                generator.wbsStructure.filter(node => 
-                    node['WBS'].match(/^\+[A-Z]+\d+$/) || node['WBS'].match(/^T\d+$/)
-                ).length / 2 : 0;
+            // Calculate performance metrics
+            const equipmentItems = generator ? generator.wbsStructure.filter(function(node) {
+                return node['WBS'].match(/^\+[A-Z]+\d+$/) || node['WBS'].match(/^T\d+$/);
+            }).length / 2 : 0;
             
             const nodesPerEquipment = equipmentItems > 0 ? (totalNodes / equipmentItems).toFixed(1) : 0;
             
+            // Determine performance status
             let performanceClass = 'excellent';
             let performanceMessage = 'Excellent - Optimized structure with fixed ordering achieved!';
             
             if (nodesPerEquipment > 15) {
                 performanceClass = 'needs-improvement';
-                performanceMessage = 'Needs Improvement - High node count detected.';
+                performanceMessage = 'Needs Improvement - High node count detected. Consider reviewing equipment hierarchy.';
             } else if (nodesPerEquipment > 12) {
                 performanceClass = 'good';
                 performanceMessage = 'Good - Structure is acceptable but could be optimized further.';
             }
 
             statsDiv.innerHTML = 
-                '<div class="stat-card"><div class="stat-value">' + totalNodes + '</div><div class="stat-label">Total Nodes</div></div>' +
-                '<div class="stat-card"><div class="stat-value">' + equipmentItems + '</div><div class="stat-label">Equipment Items</div></div>' +
-                '<div class="stat-card"><div class="stat-value">' + nodesPerEquipment + '</div><div class="stat-label">Nodes per Equipment</div></div>' +
-                '<div class="stat-card"><div class="stat-value">' + leafNodes + '</div><div class="stat-label">Activity Points</div></div>';
+                '<div class="stat-card">' +
+                    '<div class="stat-value">' + totalNodes + '</div>' +
+                    '<div class="stat-label">Total Nodes</div>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                    '<div class="stat-value">' + equipmentItems + '</div>' +
+                    '<div class="stat-label">Equipment Items</div>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                    '<div class="stat-value">' + nodesPerEquipment + '</div>' +
+                    '<div class="stat-label">Nodes per Equipment</div>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                    '<div class="stat-value">' + leafNodes + '</div>' +
+                    '<div class="stat-label">Activity Points</div>' +
+                '</div>';
 
+            // Update performance indicator
             performanceDiv.className = 'performance-indicator ' + performanceClass;
             performanceText.textContent = performanceMessage;
 
-            let previewText = 'WBS Structure Preview (v3.5 Optimized):\n\n';
+            let previewText = 'WBS Structure Preview (v3.5 Fixed Ordering):\n\n';
             
             function getLevel(nodeId) {
-                const node = wbsData.find(n => n['WBS ID'] === nodeId);
+                const node = wbsData.find(function(n) { 
+                    return n['WBS ID'] === nodeId; 
+                });
                 if (!node || node['Parent WBS'] === null) return 0;
                 return 1 + getLevel(node['Parent WBS']);
             }
@@ -1029,13 +1493,13 @@
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'wbs_structure_v35_optimized.csv';
+            a.download = 'wbs_structure_v35_fixed_ordering.csv';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             
-            showSuccess('✅ Optimized P6-compatible CSV downloaded!');
+            showSuccess('✅ Fixed Ordering P6-compatible CSV file downloaded successfully');
         }
 
         function downloadJSON() {
@@ -1050,32 +1514,100 @@
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'wbs_structure_v35_optimized.json';
+            a.download = 'wbs_structure_v35_fixed_ordering.json';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             
-            showSuccess('✅ Optimized JSON downloaded!');
+            showSuccess('✅ Fixed Ordering JSON file downloaded successfully');
         }
 
         function convertToCSV(data) {
             if (!data || data.length === 0) return '';
             
+            // P6 API Compatible headers
             const headers = ['wbs_code', 'parent_wbs_code', 'wbs_name'];
-            const csvRows = [headers.join(',')];
+            const csvRows = [];
             
-            data.forEach(row => {
-                const values = [
-                    row['WBS ID'],
-                    row['Parent WBS'] || '',
-                    '"' + String(row['WBS']).replace(/"/g, '""') + '"'
-                ];
+            csvRows.push(headers.join(','));
+            
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
+                const values = [];
+                
+                for (let j = 0; j < headers.length; j++) {
+                    const header = headers[j];
+                    let value;
+                    
+                    if (header === 'wbs_code') {
+                        value = row['WBS ID'];
+                    } else if (header === 'parent_wbs_code') {
+                        value = row['Parent WBS'];
+                    } else if (header === 'wbs_name') {
+                        value = row['WBS'];
+                    }
+                    
+                    if (value === null || value === undefined) {
+                        values.push('');
+                    } else {
+                        const stringValue = String(value);
+                        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                            values.push('"' + stringValue.replace(/"/g, '""') + '"');
+                        } else {
+                            values.push(stringValue);
+                        }
+                    }
+                }
                 csvRows.push(values.join(','));
-            });
+            }
             
             return csvRows.join('\n');
         }
+
+        console.log('WBS Generator v3.5 Loaded - FIXED Category Ordering + Optimized Performance');
+        console.log('✅ "Preparations and set-up" will now appear FIRST in both FAT and SAT sections!');
+        
+        // Additional debugging for file upload issues
+        window.addEventListener('load', function() {
+            console.log('Page fully loaded');
+            const fileInput = document.getElementById('fileInput');
+            const processBtn = document.getElementById('processBtn');
+            const fileInfo = document.getElementById('fileInfo');
+            
+            console.log('Elements found:', {
+                fileInput: !!fileInput,
+                processBtn: !!processBtn,
+                fileInfo: !!fileInfo
+            });
+            
+            // Check if libraries are loaded
+            console.log('Libraries loaded:', {
+                Papa: typeof Papa !== 'undefined',
+                XLSX: typeof XLSX !== 'undefined'
+            });
+            
+            if (fileInput) {
+                console.log('File input accept attribute:', fileInput.accept);
+                console.log('File input multiple attribute:', fileInput.multiple);
+            }
+            
+            // Warn if libraries not loaded
+            if (typeof Papa === 'undefined') {
+                console.error('Papa Parse library failed to load');
+            }
+            if (typeof XLSX === 'undefined') {
+                console.error('XLSX library failed to load');
+            }
+        });
+        
+        // Global error handler to catch any JavaScript errors
+        window.addEventListener('error', function(event) {
+            console.error('JavaScript error detected:', event.error);
+            console.error('Error message:', event.message);
+            console.error('Error filename:', event.filename);
+            console.error('Error line:', event.lineno);
+        });
     </script>
 </body>
 </html>
