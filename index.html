@@ -996,56 +996,15 @@
                 }
             }
 
+            // Remove the old methods that are no longer needed
             addOrphanEquipment(orphanEquipment) {
-                console.log('=== v3.5 PROCESSING ORPHAN EQUIPMENT (TRUE ROOTS) ===');
-                console.log('Orphan equipment:', orphanEquipment.map(eq => eq.equipment + ' (' + (eq.type || 'Unknown') + ')'));
-                
-                for (const eqItem of orphanEquipment) {
-                    const eqType = eqItem.type;
-                    const equipmentName = eqItem.equipment;
-                    const description = eqItem.plu_name;
-                    
-                    console.log('Processing orphan: ' + equipmentName + ' with type: ' + eqType);
-                    
-                    if (eqType === '+UH') {
-                        this.addToProtectionPanels(equipmentName, description);
-                    } else if (eqType === '+WC') {
-                        this.addToLvSwitchboards(equipmentName, description);
-                    } else if (eqType === '+WA') {
-                        this.addToHvSwitchboards(equipmentName, description);
-                    } else if (eqType === 'T') {
-                        this.addToTransformers(equipmentName, description);
-                    } else if (['D', 'E', 'CB'].includes(eqType)) {
-                        // These are now handled by unrecognised equipment or their parents
-                        console.log('Skipping orphaned protection device (should have parent): ' + equipmentName);
-                    } else if (eqType === '+CA') {
-                        this.addToAncillarySystems(equipmentName, description);
-                    } else if (eqType === '+GB') {
-                        this.addToDcBatterySystems(equipmentName, description);
-                    } else if (['+HN', 'PC', 'FM', 'ASDU', 'LOOP'].includes(eqType)) {
-                        this.addToBuildingServices(equipmentName, description);
-                    } else if (eqType === '-UC' || eqType === '+UC') {
-                        this.addToDcSystems(equipmentName, description);
-                    } else {
-                        console.log('Using fallback for ' + equipmentName + ' (type: ' + eqType + ')');
-                        this.addToAncillarySystems(equipmentName, description);
-                    }
-                }
+                // This method is now replaced by addOrphanEquipmentToSubsystem
+                console.log('Legacy method - use subsystem-specific methods instead');
             }
 
             addUnrecognisedEquipment(unrecognisedEquipment) {
-                console.log('=== PROCESSING UNRECOGNISED EQUIPMENT ===');
-                
-                for (const eqItem of unrecognisedEquipment) {
-                    const equipmentName = eqItem.equipment;
-                    const description = eqItem.plu_name;
-                    
-                    console.log('Adding unrecognised equipment: ' + equipmentName);
-                    
-                    const parentId = this.keySections['unrecognised'];
-                    const fullName = description ? equipmentName + ' ' + description : equipmentName;
-                    this.createWbsNode(fullName, parentId);
-                }
+                // This method is now replaced by addUnrecognisedEquipmentToSubsystem
+                console.log('Legacy method - use subsystem-specific methods instead');
             }
 
             // Subsystem-specific equipment addition methods
@@ -1410,8 +1369,9 @@
                 return this.wbsStructure;
             }
         }
+        }
 
-        // File handling functions - FIXED
+        // File handling functions
         function handleFileUpload() {
             console.log('Upload button clicked');
             const fileInput = document.getElementById('fileInput');
