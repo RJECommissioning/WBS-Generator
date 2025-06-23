@@ -390,7 +390,7 @@
         // WBS Generator Class - Version 3.5 with Subsystem Support + Professional Naming
         class WBSGenerator {
             constructor() {
-                this.wbsCounter = 1;
+                this.wbsCounter = 1000; // Start from 1000 to avoid conflicts
                 this.wbsStructure = [];
                 
                 // Enhanced equipment recognition
@@ -752,7 +752,7 @@
             }
 
             buildStandardStructure(projectName) {
-                this.wbsCounter = 1;
+                this.wbsCounter = 1000; // Start from 1000 to avoid conflicts
                 this.wbsStructure = [];
                 
                 const projectId = this.createWbsNode(projectName || "Project Name", null);
