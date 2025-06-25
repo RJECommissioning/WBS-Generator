@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WBS Generator v3.5</title>
+    <title>WBS Generator v3.6</title>
     <style>
         * {
             margin: 0;
@@ -299,6 +299,19 @@
             background: #f8d7da;
             border-color: #dc3545;
         }
+
+        .commissioning-stats {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+
+        .commissioning-stats h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -306,7 +319,7 @@
         <div class="header">
             <h1>WBS Generator</h1>
             <p>Upload your equipment list and generate a comprehensive Work Breakdown Structure</p>
-            <div class="version-badge">v3.5 - Subsystem Support + Professional Naming</div>
+            <div class="version-badge">v3.6 - Commissioning Column Support + TBC Structure</div>
         </div>
 
         <div class="main-content">
@@ -315,7 +328,7 @@
                 <div class="upload-area">
                     <div class="upload-icon">📁</div>
                     <h3>Upload Equipment List</h3>
-                    <p>Support for CSV, Excel (.xlsx), and JSON files</p>
+                    <p>Support for CSV, Excel (.xlsx), and JSON files with Commissioning (Y/N/TBC) column</p>
                     <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.json" />
                     <button class="upload-btn" onclick="handleFileUpload()">
                         Choose File
@@ -359,6 +372,8 @@
                 <div class="results-content">
                     <div class="stats" id="stats"></div>
                     
+                    <div class="commissioning-stats" id="commissioningStats"></div>
+                    
                     <div id="performanceIndicator" class="performance-indicator excellent">
                         <strong>Performance Status:</strong> <span id="performanceText">Excellent - Optimized structure achieved!</span>
                     </div>
@@ -387,13 +402,20 @@
         let wbsData = null;
         let generator = null;
 
-        // WBS Generator Class - Version 3.5 with Subsystem Support + Professional Naming
+        // WBS Generator Class - Version 3.6 with Commissioning Column Support
         class WBSGenerator {
             constructor() {
                 this.wbsCounter = 1000; // Start from 1000 to avoid conflicts
                 this.wbsStructure = [];
+                this.commissioningStats = {
+                    total: 0,
+                    Y: 0,
+                    N: 0,
+                    TBC: 0,
+                    processed: 0
+                };
                 
-                // Enhanced equipment recognition
+                // Enhanced equipment recognition (existing patterns unchanged)
                 this.equipmentTypes = {
                     '+UH': 'Protection Panels',
                     '+WC': 'LV Switchboards', 
@@ -444,6 +466,23 @@
                     'D\\d+\\s*/\\s*E\\d+': 'Protection Devices',
                     '.*-UC\\d+': 'DC Systems'
                 };
+            }
+
+            // NEW: Extract commissioning status
+            extractCommissioning(item) {
+                return (
+                    item.commissioning || 
+                    item.Commissioning ||
+                    item['commissioning (y/n)'] ||
+                    item['Commissioning (Y/N)'] ||
+                    item['commissioning_y_n'] ||
+                    item['Commissioning_Y_N'] ||
+                    item['commissioning status'] ||
+                    item['Commissioning Status'] ||
+                    item['commissioning_status'] ||
+                    item['Commissioning_Status'] ||
+                    ''
+                ).toString().trim().toUpperCase();
             }
 
             // Extract subsystem information
@@ -607,13 +646,88 @@
                 return fullEquipmentCode;
             }
 
+            // NEW: Filter equipment by commissioning status
+            filterEquipmentByCommissioning(equipmentData) {
+                console.log('=== FILTERING EQUIPMENT BY COMMISSIONING STATUS ===');
+                
+                const filtered = {
+                    Y: [],        // Include in regular WBS
+                    TBC: [],      // Include in TBC WBS
+                    N: [],        // Exclude completely
+                    unknown: []   // Missing commissioning status
+                };
+
+                // Reset stats
+                this.commissioningStats = { total: 0, Y: 0, N: 0, TBC: 0, processed: 0 };
+
+                for (const item of equipmentData) {
+                    const equipment = this.extractEquipment(item);
+                    const commissioning = this.extractCommissioning(item);
+                    
+                    this.commissioningStats.total++;
+                    
+                    if (!equipment || equipment.trim() === '') {
+                        continue; // Skip items without equipment numbers
+                    }
+
+                    if (commissioning === 'Y') {
+                        filtered.Y.push(item);
+                        this.commissioningStats.Y++;
+                    } else if (commissioning === 'TBC') {
+                        filtered.TBC.push(item);
+                        this.commissioningStats.TBC++;
+                    } else if (commissioning === 'N') {
+                        filtered.N.push(item);
+                        this.commissioningStats.N++;
+                    } else {
+                        filtered.unknown.push(item);
+                        // Treat unknown as Y for backward compatibility
+                        filtered.Y.push(item);
+                        this.commissioningStats.Y++;
+                    }
+                }
+
+                console.log('Commissioning filter results:');
+                console.log(`Total items: ${this.commissioningStats.total}`);
+                console.log(`Y (include): ${this.commissioningStats.Y}`);
+                console.log(`N (exclude): ${this.commissioningStats.N}`);
+                console.log(`TBC (separate WBS): ${this.commissioningStats.TBC}`);
+                console.log(`Processing ${filtered.Y.length} Y items and ${filtered.TBC.length} TBC items`);
+
+                this.commissioningStats.processed = filtered.Y.length + filtered.TBC.length;
+
+                return filtered;
+            }
+
             parseEquipmentList(equipmentData) {
-                console.log('=== PARSING EQUIPMENT LIST - v3.5 WITH SUBSYSTEM SUPPORT ===');
+                console.log('=== PARSING EQUIPMENT LIST - v3.6 WITH COMMISSIONING SUPPORT ===');
+                
+                // NEW: Filter by commissioning status first
+                const filteredData = this.filterEquipmentByCommissioning(equipmentData);
+                
                 const equipmentBySubsystem = {};
+                const tbcEquipmentBySubsystem = {};
                 
                 if (equipmentData.length > 0) {
                     console.log('Available columns:', Object.keys(equipmentData[0]));
                 }
+                
+                // Process Y equipment (regular WBS)
+                console.log('Processing Y equipment for regular WBS...');
+                const yEquipmentBySubsystem = this.groupEquipmentBySubsystem(filteredData.Y);
+                
+                // Process TBC equipment (separate WBS)
+                console.log('Processing TBC equipment for TBC WBS...');
+                const tbcEquipmentGrouped = this.groupTbcEquipment(filteredData.TBC);
+                
+                return {
+                    regular: yEquipmentBySubsystem,
+                    tbc: tbcEquipmentGrouped
+                };
+            }
+
+            groupEquipmentBySubsystem(equipmentData) {
+                const equipmentBySubsystem = {};
                 
                 // Group equipment by subsystem first
                 for (const item of equipmentData) {
@@ -649,6 +763,45 @@
                 }
                 
                 return equipmentBySubsystem;
+            }
+
+            // NEW: Group TBC equipment with parent-child relationships
+            groupTbcEquipment(tbcData) {
+                console.log('Grouping TBC equipment with parent-child relationships...');
+                
+                const tbcEquipment = [];
+                const parentChildMap = new Map();
+
+                // First pass: collect all equipment and build parent-child relationships
+                for (const item of tbcData) {
+                    const equipment = this.extractEquipment(item);
+                    const parent = this.extractParent(item);
+                    const description = this.extractDescription(item);
+                    
+                    if (!equipment) continue;
+
+                    const equipmentItem = {
+                        equipment,
+                        parent: (parent && parent !== '-') ? parent : null,
+                        description,
+                        fullItem: item
+                    };
+
+                    tbcEquipment.push(equipmentItem);
+
+                    // Build parent-child map
+                    if (equipmentItem.parent) {
+                        if (!parentChildMap.has(equipmentItem.parent)) {
+                            parentChildMap.set(equipmentItem.parent, []);
+                        }
+                        parentChildMap.get(equipmentItem.parent).push(equipmentItem);
+                    }
+                }
+
+                return {
+                    equipment: tbcEquipment,
+                    parentChildMap
+                };
             }
 
             parseSubsystemEquipment(equipmentData) {
@@ -776,10 +929,66 @@
                     energisation: energisationId,
                     prerequisites: prerequisitesId,
                     milestones: milestonesId,
-                    subsystems: {}
+                    subsystems: {},
+                    tbc: null  // NEW: Will hold TBC section
                 };
                 
                 return projectId;
+            }
+
+            // NEW: Create TBC WBS structure
+            createTbcStructure(tbcData) {
+                if (!tbcData || !tbcData.equipment || tbcData.equipment.length === 0) {
+                    console.log('No TBC equipment to process');
+                    return;
+                }
+
+                console.log(`Creating TBC structure for ${tbcData.equipment.length} TBC equipment items`);
+                
+                // Create TBC section at project level
+                const tbcId = this.createWbsNode("TBC - Equipment To Be Confirmed", this.keySections.project);
+                this.keySections.tbc = tbcId;
+
+                // Create root equipment first (those without parents)
+                const processedEquipment = new Set();
+                
+                // Find and create root equipment
+                const rootEquipment = tbcData.equipment.filter(item => !item.parent);
+                for (const item of rootEquipment) {
+                    this.createTbcEquipmentNode(item, tbcId, tbcData.parentChildMap, processedEquipment);
+                }
+
+                // Handle any remaining orphaned equipment
+                for (const item of tbcData.equipment) {
+                    if (!processedEquipment.has(item.equipment)) {
+                        this.createTbcEquipmentNode(item, tbcId, tbcData.parentChildMap, processedEquipment);
+                    }
+                }
+
+                console.log(`TBC structure created with ${processedEquipment.size} equipment items`);
+            }
+
+            // NEW: Create TBC equipment node with children
+            createTbcEquipmentNode(equipmentItem, parentWbsId, parentChildMap, processedEquipment) {
+                if (processedEquipment.has(equipmentItem.equipment)) {
+                    return; // Already processed
+                }
+
+                // Create node for this equipment
+                const displayName = equipmentItem.description ? 
+                    `${equipmentItem.equipment} - ${equipmentItem.description}` : 
+                    equipmentItem.equipment;
+                
+                const equipmentWbsId = this.createWbsNode(displayName, parentWbsId);
+                processedEquipment.add(equipmentItem.equipment);
+
+                // Create child equipment if any
+                if (parentChildMap.has(equipmentItem.equipment)) {
+                    const children = parentChildMap.get(equipmentItem.equipment);
+                    for (const child of children) {
+                        this.createTbcEquipmentNode(child, equipmentWbsId, parentChildMap, processedEquipment);
+                    }
+                }
             }
 
             createSubsystemStructure(subsystemName) {
@@ -1129,19 +1338,25 @@
             }
 
             generateWbs(equipmentData, projectName) {
-                console.log('=== WBS GENERATOR v3.5 START (SUBSYSTEM SUPPORT + PROFESSIONAL NAMING) ===');
+                console.log('=== WBS GENERATOR v3.6 START (COMMISSIONING COLUMN SUPPORT) ===');
                 
                 if (!equipmentData || equipmentData.length === 0) {
                     console.warn("No equipment data provided");
                     return [];
                 }
                 
-                const equipmentBySubsystem = this.parseEquipmentList(equipmentData);
+                const parsedData = this.parseEquipmentList(equipmentData);
                 this.buildStandardStructure(projectName);
-                this.addEquipmentToStructure(equipmentBySubsystem);
                 
-                console.log('=== WBS GENERATOR v3.5 COMPLETE ===');
+                // Add regular equipment (Y status)
+                this.addEquipmentToStructure(parsedData.regular);
+                
+                // Add TBC equipment structure
+                this.createTbcStructure(parsedData.tbc);
+                
+                console.log('=== WBS GENERATOR v3.6 COMPLETE ===');
                 console.log('Final WBS structure: ' + this.wbsStructure.length + ' nodes');
+                console.log('Commissioning stats:', this.commissioningStats);
                 
                 return this.wbsStructure;
             }
@@ -1246,7 +1461,7 @@
                 wbsData = generator.generateWbs(equipmentData, projectName);
 
                 displayResults();
-                showSuccess('✅ Subsystem-based WBS structure generated with professional | naming!');
+                showSuccess('✅ WBS structure generated with Commissioning column support + TBC structure!');
 
             } catch (error) {
                 showError('Error processing file: ' + error.message);
@@ -1348,6 +1563,7 @@
         function displayResults() {
             const resultsSection = document.getElementById('resultsSection');
             const statsDiv = document.getElementById('stats');
+            const commissioningStatsDiv = document.getElementById('commissioningStats');
             const previewDiv = document.getElementById('wbsPreview');
             const performanceDiv = document.getElementById('performanceIndicator');
             const performanceText = document.getElementById('performanceText');
@@ -1367,7 +1583,7 @@
             const nodesPerEquipment = equipmentItems > 0 ? (totalNodes / equipmentItems).toFixed(1) : 0;
             
             let performanceClass = 'excellent';
-            let performanceMessage = 'Excellent - Subsystem structure with professional naming achieved!';
+            let performanceMessage = 'Excellent - Commissioning column support with TBC structure achieved!';
             
             if (nodesPerEquipment > 15) {
                 performanceClass = 'needs-improvement';
@@ -1383,10 +1599,26 @@
                 '<div class="stat-card"><div class="stat-value">' + nodesPerEquipment + '</div><div class="stat-label">Nodes per Equipment</div></div>' +
                 '<div class="stat-card"><div class="stat-value">' + leafNodes + '</div><div class="stat-label">Activity Points</div></div>';
 
+            // NEW: Display commissioning statistics
+            if (generator && generator.commissioningStats) {
+                const stats = generator.commissioningStats;
+                commissioningStatsDiv.innerHTML = 
+                    '<h4>Commissioning Filter Results</h4>' +
+                    '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 10px;">' +
+                    '<div style="text-align: center; padding: 10px; background: #e8f5e8; border-radius: 5px;"><strong>' + stats.Y + '</strong><br><small>Y (Included)</small></div>' +
+                    '<div style="text-align: center; padding: 10px; background: #fff3cd; border-radius: 5px;"><strong>' + stats.TBC + '</strong><br><small>TBC (Separate WBS)</small></div>' +
+                    '<div style="text-align: center; padding: 10px; background: #f8d7da; border-radius: 5px;"><strong>' + stats.N + '</strong><br><small>N (Excluded)</small></div>' +
+                    '<div style="text-align: center; padding: 10px; background: #e2e3e5; border-radius: 5px;"><strong>' + stats.processed + '</strong><br><small>Total Processed</small></div>' +
+                    '</div>';
+                commissioningStatsDiv.style.display = 'block';
+            } else {
+                commissioningStatsDiv.style.display = 'none';
+            }
+
             performanceDiv.className = 'performance-indicator ' + performanceClass;
             performanceText.textContent = performanceMessage;
 
-            let previewText = 'WBS Structure Preview (v3.5 Subsystem + Professional Naming):\n\n';
+            let previewText = 'WBS Structure Preview (v3.6 Commissioning Column Support + TBC):\n\n';
             
             function getLevel(nodeId) {
                 const node = wbsData.find(function(n) { 
@@ -1423,13 +1655,13 @@
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'wbs_structure_v35_subsystems.csv';
+            a.download = 'wbs_structure_v36_commissioning.csv';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             
-            showSuccess('✅ Subsystem WBS CSV downloaded!');
+            showSuccess('✅ Commissioning WBS CSV downloaded!');
         }
 
         function downloadJSON() {
@@ -1444,13 +1676,13 @@
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'wbs_structure_v35_subsystems.json';
+            a.download = 'wbs_structure_v36_commissioning.json';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             
-            showSuccess('✅ Subsystem WBS JSON downloaded!');
+            showSuccess('✅ Commissioning WBS JSON downloaded!');
         }
 
         function convertToCSV(data) {
@@ -1471,8 +1703,8 @@
             return csvRows.join('\n');
         }
 
-        console.log('WBS Generator v3.5 Loaded - Subsystem Support + Professional | Naming');
-        console.log('✅ Ready to process equipment lists with subsystem support');
+        console.log('WBS Generator v3.6 Loaded - Commissioning Column Support + TBC Structure');
+        console.log('✅ Ready to process equipment lists with Commissioning (Y/N/TBC) column support');
     </script>
 </body>
 </html>
